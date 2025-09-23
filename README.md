@@ -1,5 +1,5 @@
 <<<<<<< HEAD
-# TravelX
+# ClgMart
 =======
 # Welcome to your Expo app 👋
 
