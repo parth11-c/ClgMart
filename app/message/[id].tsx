@@ -57,7 +57,20 @@ export default function MessageScreen() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
         const msg = payload.new as ChatMessage;
         const match = (msg.sender_id === myId && msg.recipient_id === peerId) || (msg.sender_id === peerId && msg.recipient_id === myId);
-        if (match) setMessages(prev => [...prev, msg]);
+        if (!match) return;
+        setMessages(prev => {
+          // If we already have this message ID, ignore
+          if (prev.some(m => m.id === msg.id)) return prev;
+          // If we have an optimistic temp message by me with same body, replace it
+          const tempIdx = prev.findIndex(m => m.id.startsWith('temp-') && m.sender_id === myId && m.body === msg.body);
+          if (tempIdx >= 0) {
+            const next = [...prev];
+            next[tempIdx] = msg;
+            return next;
+          }
+          // Otherwise append
+          return [...prev, msg];
+        });
       })
       .subscribe();
     return () => { channel.unsubscribe(); };
@@ -66,10 +79,33 @@ export default function MessageScreen() {
   const sendMessage = async () => {
     const body = input.trim();
     if (!body || !ready) return;
+    // Optimistic UI: append a temp message immediately
+    const tempId = `temp-${Date.now()}`;
+    const tempMsg: ChatMessage = {
+      id: tempId,
+      sender_id: myId!,
+      recipient_id: peerId,
+      body,
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, tempMsg]);
+    setInput('');
     setSending(true);
     try {
-      const { error } = await supabase.from('messages').insert({ sender_id: myId, recipient_id: peerId, body });
-      if (!error) setInput('');
+      // Insert and return the created row so we can reconcile the optimistic item
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({ sender_id: myId, recipient_id: peerId, body })
+        .select('id, sender_id, recipient_id, body, created_at')
+        .single();
+      if (!error && data) {
+        const real = data as ChatMessage;
+        setMessages(prev => prev.map(m => (m.id === tempId ? real : m)));
+      } else if (error) {
+        // Remove the optimistic message on failure
+        setMessages(prev => prev.filter(m => m.id !== tempId));
+        setInput(body); // restore input for retry
+      }
     } finally {
       setSending(false);
     }

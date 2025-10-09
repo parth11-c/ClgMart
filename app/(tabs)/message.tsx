@@ -29,6 +29,7 @@ export default function MessagesTab() {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [items, setItems] = React.useState<Conversation[]>([]);
+  const fetchingPeersRef = React.useRef<Set<string>>(new Set());
 
   const load = React.useCallback(async () => {
     if (!myId) return;
@@ -69,11 +70,39 @@ export default function MessagesTab() {
   React.useEffect(() => {
     if (!myId) return;
     const channel = supabase.channel(`messages-tab-${myId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload: any) => {
         const m = payload.new as ChatMessage;
         if (m.sender_id !== myId && m.recipient_id !== myId) return;
-        // Reload to update preview ordering
-        load();
+        const other = m.sender_id === myId ? m.recipient_id : m.sender_id;
+
+        // Incrementally update list: move/update conversation to top
+        setItems(prev => {
+          const idx = prev.findIndex(c => c.peerId === other);
+          const existing = idx >= 0 ? prev[idx] : undefined;
+          const updated: Conversation = {
+            peerId: other,
+            lastMessage: m,
+            peer: existing?.peer ?? null,
+          };
+          const next = [...prev];
+          if (idx >= 0) next.splice(idx, 1);
+          next.unshift(updated);
+          return next;
+        });
+
+        // Fetch peer profile if we don't have it yet
+        const hasPeer = items.some(c => c.peerId === other && c.peer);
+        if (!hasPeer && !fetchingPeersRef.current.has(other)) {
+          fetchingPeersRef.current.add(other);
+          try {
+            const { data: prof } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', other).single();
+            if (prof) {
+              setItems(prev => prev.map(c => (c.peerId === other ? { ...c, peer: prof as any } : c)));
+            }
+          } finally {
+            fetchingPeersRef.current.delete(other);
+          }
+        }
       })
       .subscribe();
     return () => { channel.unsubscribe(); };

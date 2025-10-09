@@ -33,7 +33,19 @@ export default function SignUpScreen() {
       setLoading(true);
       const res = await signUp(email, password, fullName.trim());
       setLoading(false);
-      if (!res.ok) return Alert.alert("Sign up failed", res.reason);
+      if (!res.ok) {
+        if (res.reason === "EMAIL_ALREADY_REGISTERED") {
+          return Alert.alert(
+            "Email already registered",
+            "This email already has an account. Please sign in instead.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Go to Sign In", onPress: () => router.replace("/auth/sign-in" as any) }
+            ]
+          );
+        }
+        return Alert.alert("Sign up failed", res.reason);
+      }
       Alert.alert(
         "Verify your email",
         "We have sent a verification link to your email. Please verify your email before signing in.",

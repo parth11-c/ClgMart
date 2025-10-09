@@ -1,22 +1,25 @@
 {
   "expo": {
-    "name": "travel",
-    "slug": "travel",
+    "name": "Clgmart",
+    "slug": "Clgmart",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "travel",
+    "scheme": "clgmart",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.parth1127.clgmart",
+      "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Capture a place photo to create a post.",
         "NSPhotoLibraryUsageDescription": "Select a place photo to create a post.",
-        "NSLocationWhenInUseUsageDescription": "Verify you're at the place and auto-fill coordinates."
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -24,7 +27,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.parth1127.clgmart"
     },
     "web": {
       "output": "static",
@@ -48,6 +52,19 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/69f5fdc6-9c78-4dc7-8375-e4037d464a75"
+    },
+    "owner": "parth1127",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "69f5fdc6-9c78-4dc7-8375-e4037d464a75"
+      }
     }
   }
 }

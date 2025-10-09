@@ -178,14 +178,26 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signUp: StoreContextType['signUp'] = async (email, password, name) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { name },
       },
     });
-    if (error) return { ok: false, reason: error.message };
+    if (!error) {
+      const identities = (data as any)?.user?.identities;
+      if (Array.isArray(identities) && identities.length === 0) {
+        return { ok: false, reason: 'EMAIL_ALREADY_REGISTERED' };
+      }
+    }
+    if (error) {
+      const message = error.message || '';
+      if (message.toLowerCase().includes('already registered')) {
+        return { ok: false, reason: 'EMAIL_ALREADY_REGISTERED' };
+      }
+      return { ok: false, reason: message || 'Unknown error' };
+    }
     // Do not auto sign-in; user must verify email first
     return { ok: true };
   };
