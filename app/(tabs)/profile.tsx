@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert, Linking } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert, Linking, Platform } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 // Removed SafeAreaView and insets
 import { useStore } from "@/store";
@@ -7,7 +7,7 @@ import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
 
 export default function ProfileScreen() {
-  const { currentUser, userPosts, deletePost } = useStore();
+  const { currentUser, userPosts, deletePost, deleteAccount } = useStore();
   const posts = userPosts(currentUser.id);
 
   const formatPhone = (raw?: string) => {
@@ -33,6 +33,35 @@ export default function ProfileScreen() {
     }
     parts.push(rest);
     return `${cc} ${parts.join(' ')}`.trim();
+  };
+
+  const confirmDeleteAccount = () => {
+    const doDelete = async () => {
+      const res = await deleteAccount();
+      if (!res.ok) {
+        Alert.alert('Error', res.reason || 'Failed to delete account.');
+        return;
+      }
+      router.replace('/' as any);
+    };
+
+    if (Platform.OS === 'web') {
+      // react-native-web Alert does not support multi-button callbacks
+      const ok = typeof window !== 'undefined' ? window.confirm('This will permanently delete your profile, posts, and associated images. This action cannot be undone.') : false;
+      if (ok) {
+        doDelete();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Delete account',
+      'This will permanently delete your profile, posts, and associated images. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]
+    );
   };
 
   const onLogout = async () => {
@@ -103,6 +132,10 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={16} color="#fff" />
           <Text style={styles.logoutBtnText}>Logout</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteAccBtn} onPress={confirmDeleteAccount}>
+          <Ionicons name="trash-outline" size={16} color="#fff" />
+          <Text style={styles.deleteAccBtnText}>Delete account</Text>
+        </TouchableOpacity>
       </View>
 
       {(!currentUser?.avatar || !currentUser?.name || currentUser?.name === 'User' || !currentUser?.phone) && (
@@ -172,6 +205,8 @@ const styles = StyleSheet.create({
   wpBtnText: { color: '#1f3124', fontWeight: '800' },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#c0392b', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#9e2f23' },
   logoutBtnText: { color: '#fff', fontWeight: '800' },
+  deleteAccBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#8b0000', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#5e0000' },
+  deleteAccBtnText: { color: '#fff', fontWeight: '800' },
   prompt: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#161616', borderWidth: 1, borderColor: '#222', padding: 10, borderRadius: 10, marginBottom: 8 },
   promptText: { color: '#ddd', flex: 1, fontSize: 13 },
   gridContent: { paddingTop: 8 },

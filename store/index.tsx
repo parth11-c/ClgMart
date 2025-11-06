@@ -25,6 +25,7 @@ type StoreContextType = StoreState & {
   }) => Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
   deletePost: (postId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
   updateProfile: (input: { name?: string; phone?: string; avatarUri?: string | null }) => Promise<{ ok: true } | { ok: false; reason: string }>;
+  deleteAccount: () => Promise<{ ok: true } | { ok: false; reason: string }>;
 };
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -111,6 +112,74 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     }
     await loadSession();
     return { ok: true };
+  };
+
+  const deleteAccount: StoreContextType['deleteAccount'] = async () => {
+    try {
+      if (!state.currentUser.id) return { ok: false, reason: 'Not signed in' };
+      const uid = state.currentUser.id;
+
+      const myPosts = state.posts.filter(p => p.userId === uid);
+      for (const post of myPosts) {
+        try {
+          const url = post.imageUri || '';
+          const marker = `/object/public/${POSTS_BUCKET}/`;
+          const idx = url.indexOf(marker);
+          if (idx !== -1) {
+            const path = url.slice(idx + marker.length);
+            if (path) {
+              await supabase.storage.from(POSTS_BUCKET).remove([path]);
+            }
+          }
+        } catch (e) {}
+      }
+
+      const { error: delPostsErr } = await supabase.from('products').delete().eq('user_id', uid);
+      if (delPostsErr) return { ok: false, reason: delPostsErr.message };
+
+      try {
+        const url = state.currentUser.avatar || '';
+        const marker = `/object/public/${AVATARS_BUCKET}/`;
+        const idx = url.indexOf(marker);
+        if (idx !== -1) {
+          const path = url.slice(idx + marker.length);
+          if (path) {
+            await supabase.storage.from(AVATARS_BUCKET).remove([path]);
+          }
+        }
+      } catch (e) {}
+
+      const { error: delProfileErr } = await supabase.from('profiles').delete().eq('id', uid);
+      if (delProfileErr) return { ok: false, reason: delProfileErr.message };
+
+      // Also delete the auth user via Edge Function (requires you to deploy it with service role)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+          const resp = await fetch('https://lbokwacyptslrkqubsoh.supabase.co/functions/v1/delete-auth-user', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          if (!resp.ok) {
+            const msg = await resp.text();
+            console.warn('[deleteAccount] delete-auth-user http error:', resp.status, msg);
+          }
+        }
+      } catch (e) {
+        console.warn('[deleteAccount] delete-auth-user function failed:', (e as any)?.message || e);
+      }
+
+      await supabase.auth.signOut();
+      setState((prev) => ({ ...prev, currentUser: { id: '', name: '' }, posts: prev.posts.filter(p => p.userId !== uid) }));
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, reason: e.message };
+    }
   };
 
   const updateProfile: StoreContextType['updateProfile'] = async (input) => {
@@ -337,6 +406,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     createPost,
     deletePost,
     updateProfile,
+    deleteAccount,
   }), [state]);
 
   return (
