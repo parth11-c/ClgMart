@@ -6,6 +6,7 @@ import { fontSizes, responsiveValue, buttonDimensions, shadows } from "../../lib
 import { useStore } from "@/store";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
+import { startGoogleOAuth } from "@/lib/oauth";
 
 export default function SignUpScreen() {
   const { signUp } = useStore();
@@ -22,14 +23,7 @@ export default function SignUpScreen() {
 
   const handleGoogleAuth = async () => {
     try {
-      const redirectTo = Platform.OS === 'web'
-        ? (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined)
-        : 'travel://auth/callback';
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo },
-      });
-      if (error) throw error;
+      await startGoogleOAuth();
     } catch (e: any) {
       Alert.alert('OAuth error', e?.message || 'Could not start Google sign-in');
     }

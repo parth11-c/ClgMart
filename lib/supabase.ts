@@ -11,7 +11,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     storageKey: 'clgmart-auth',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    // Let supabase-js parse auth params from the URL on web (hash or code),
+    // while keeping manual handling on native.
+    detectSessionInUrl: Platform.OS === 'web',
     // Only provide AsyncStorage on native. On web, let supabase-js use localStorage automatically.
     ...(Platform.OS !== 'web' ? { storage: AsyncStorage as any } : {}),
   },
