@@ -4,6 +4,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { fontSizes, responsiveValue, buttonDimensions, shadows } from "../../lib/responsive";
 import { useStore } from "@/store";
+import { supabase } from "@/lib/supabase";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function SignUpScreen() {
   const { signUp } = useStore();
@@ -13,8 +15,25 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const handleGoogleAuth = async () => {
+    try {
+      const redirectTo = Platform.OS === 'web'
+        ? (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined)
+        : 'travel://auth/callback';
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      });
+      if (error) throw error;
+    } catch (e: any) {
+      Alert.alert('OAuth error', e?.message || 'Could not start Google sign-in');
+    }
+  };
 
   const validateEmail = (value: string) => /[^\s@]+@[^\s@]+\.[^\s@]+/.test(value);
   const validatePhone = (value: string) => /^\+?[0-9\s-]{7,15}$/.test(value.trim());
@@ -46,6 +65,7 @@ export default function SignUpScreen() {
         }
         return Alert.alert("Sign up failed", res.reason);
       }
+      setEmailSent(true);
       Alert.alert(
         "Verify your email",
         "We have sent a verification link to your email. Please verify your email before signing in.",
@@ -54,6 +74,29 @@ export default function SignUpScreen() {
     } catch (e: any) {
       setLoading(false);
       Alert.alert("Error", e?.message ?? "Something went wrong");
+    }
+  };
+
+  const handleResend = async () => {
+    if (!validateEmail(email)) {
+      return Alert.alert("Invalid email", "Enter a valid email to resend the verification link.");
+    }
+    try {
+      setResendLoading(true);
+      const redirectTo = Platform.OS === 'web'
+        ? (typeof window !== 'undefined' ? `${window.location.origin}/auth/verified` : undefined)
+        : 'travel://auth/verified';
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: redirectTo }
+      });
+      setResendLoading(false);
+      if (error) return Alert.alert('Could not resend', error.message);
+      Alert.alert('Verification sent', 'Please check your inbox for the new verification email.');
+    } catch (e: any) {
+      setResendLoading(false);
+      Alert.alert('Error', e?.message || 'Something went wrong');
     }
   };
 
@@ -145,6 +188,13 @@ export default function SignUpScreen() {
                     <Text style={styles.buttonText}>Create Account</Text>
                   )}
                 </TouchableOpacity>
+                {emailSent && (
+                  <TouchableOpacity style={[styles.ghostButton, resendLoading && styles.ghostButtonDisabled]} onPress={handleResend} disabled={resendLoading}>
+                    {resendLoading ? <ActivityIndicator color="#aab1b8" /> : (
+                      <Text style={styles.ghostButtonText}>Resend verification email</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.footer}>
@@ -153,6 +203,18 @@ export default function SignUpScreen() {
                   <Text style={styles.linkText}>Sign In</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+            {/* Bottom social (outside card) */}
+            <View style={styles.bottomSocialWrap}>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <TouchableOpacity style={styles.googleOutlineBtn} onPress={handleGoogleAuth}>
+                <Ionicons name="logo-google" size={18} color="#4285F4" style={{ marginRight: 10 }} />
+                <Text style={styles.googleOutlineText}>Sign up with Google</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
@@ -171,6 +233,13 @@ const styles = StyleSheet.create({
   logo: { fontSize: responsiveValue(fontSizes.xl, 26), fontWeight: "800", color: "#fff", marginBottom: responsiveValue(6, 10), letterSpacing: -0.5 },
   title: { fontSize: responsiveValue(fontSizes.lg, 22), color: "#fff", fontWeight: "700", marginBottom: responsiveValue(4, 6) },
   subtitle: { fontSize: responsiveValue(fontSizes.md, 14), color: "#9aa0a6", textAlign: "center" },
+  socialWrap: { gap: 10, marginBottom: responsiveValue(12, 16) },
+  googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: '#e5e7eb' },
+  googleIcon: { fontSize: 16 },
+  googleText: { color: '#111827', fontWeight: '800' },
+  auth0Btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#111', borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: '#333' },
+  auth0Icon: { fontSize: 16 },
+  auth0Text: { color: '#fff', fontWeight: '800' },
   form: { marginBottom: responsiveValue(10, 16) },
   inputBlock: { marginBottom: responsiveValue(12, 16) },
   inputRow: { flexDirection: "row", gap: 12 },
@@ -184,7 +253,20 @@ const styles = StyleSheet.create({
   button: { backgroundColor: "#fff", borderRadius: 12, paddingVertical: 14, alignItems: "center", width: '100%' },
   buttonDisabled: { backgroundColor: "#2a2a2a" },
   buttonText: { color: "#000", fontSize: responsiveValue(fontSizes.md, 16), fontWeight: "700" },
+  ghostButton: { marginTop: 10, backgroundColor: 'transparent', borderRadius: 12, paddingVertical: 12, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: '#1f2329' },
+  ghostButtonDisabled: { opacity: 0.7 },
+  ghostButtonText: { color: '#aab1b8', fontSize: responsiveValue(fontSizes.sm, 13), fontWeight: '700' },
   footer: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: responsiveValue(12, 16) },
   footerText: { color: "#9aa0a6", fontSize: responsiveValue(fontSizes.sm, 12) },
   linkText: { color: "#fff", fontSize: responsiveValue(fontSizes.sm, 12), fontWeight: "700", marginLeft: 4 },
-});
+  bottomSocialWrap: { width: '100%', maxWidth: 420, marginTop: 12, paddingHorizontal: responsiveValue(16, 24) },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#1f1f22' },
+  dividerText: { color: '#6b7280', fontSize: 12, fontWeight: '700' },
+  outlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', paddingVertical: 12, backgroundColor: 'transparent', marginBottom: 10 },
+  outlineIcon: { fontSize: 16 },
+  outlineText: { color: '#e5ecff', fontWeight: '800' },
+  googleOutlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', paddingVertical: 12, backgroundColor: '#ffffff' },
+  googleOutlineText: { color: '#1f2937', fontWeight: '800' },
+})
+;

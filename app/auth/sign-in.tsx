@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { fontSizes, responsiveValue, buttonDimensions, shadows } from "../../lib/responsive";
 import { useStore } from "@/store";
+import { supabase } from "@/lib/supabase";
+import { Ionicons } from '@expo/vector-icons';
+import { startGoogleOAuth } from "@/lib/oauth";
 
 export default function SignInScreen() {
   const { signIn } = useStore();
@@ -11,6 +14,31 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // If already signed in (or after OAuth completes), go to home
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
+      if (session?.user) router.replace("/(tabs)/home" as any);
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) router.replace("/(tabs)/home" as any);
+    });
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleGoogleAuth = async () => {
+    try {
+      await startGoogleOAuth();
+    } catch (e: any) {
+      Alert.alert('OAuth error', e?.message || 'Could not start Google sign-in');
+    }
+  };
 
   const validateEmail = (value: string) => /[^\s@]+@[^\s@]+\.[^\s@]+/.test(value);
 
@@ -43,6 +71,7 @@ export default function SignInScreen() {
                 <Text style={styles.subtitle}>Sign in to your account</Text>
               </View>
 
+              {/* Email sign in */}
               <View style={styles.form}>
                 <View style={styles.inputBlock}>
                   <TextInput
@@ -87,6 +116,18 @@ export default function SignInScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+            {/* Bottom social (outside card) */}
+            <View style={styles.bottomSocialWrap}>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <TouchableOpacity style={styles.googleOutlineBtn} onPress={handleGoogleAuth}>
+                <Ionicons name="logo-google" size={18} color="#4285F4" style={{ marginRight: 10 }} />
+                <Text style={styles.googleOutlineText}>Login with Google</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -104,6 +145,22 @@ const styles = StyleSheet.create({
   logo: { fontSize: responsiveValue(fontSizes.xl, 26), fontWeight: "800", color: "#fff", marginBottom: responsiveValue(6, 10), letterSpacing: -0.5 },
   title: { fontSize: responsiveValue(fontSizes.lg, 22), color: "#fff", fontWeight: "700", marginBottom: responsiveValue(4, 6) },
   subtitle: { fontSize: responsiveValue(fontSizes.md, 14), color: "#9aa0a6", textAlign: "center" },
+  socialWrap: { gap: 10, marginBottom: responsiveValue(12, 16) },
+  googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: '#e5e7eb' },
+  googleIcon: { fontSize: 16 },
+  googleText: { color: '#111827', fontWeight: '800' },
+  auth0Btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#111', borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: '#333' },
+  auth0Icon: { fontSize: 16 },
+  auth0Text: { color: '#fff', fontWeight: '800' },
+  bottomSocialWrap: { width: '100%', maxWidth: 420, marginTop: 12, paddingHorizontal: responsiveValue(16, 24) },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#1f1f22' },
+  dividerText: { color: '#6b7280', fontSize: 12, fontWeight: '700' },
+  outlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', paddingVertical: 12, backgroundColor: 'transparent', marginBottom: 10 },
+  outlineIcon: { fontSize: 16 },
+  outlineText: { color: '#e5ecff', fontWeight: '800' },
+  googleOutlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', paddingVertical: 12, backgroundColor: '#ffffff' },
+  googleOutlineText: { color: '#1f2937', fontWeight: '800' },
   form: { marginBottom: responsiveValue(10, 16) },
   inputBlock: { marginBottom: responsiveValue(12, 16) },
   label: { fontSize: responsiveValue(fontSizes.sm, 12), color: "#a6b1b8", fontWeight: "600", marginBottom: responsiveValue(6, 8) },

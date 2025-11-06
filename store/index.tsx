@@ -178,11 +178,15 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signUp: StoreContextType['signUp'] = async (email, password, name) => {
+    const redirectTo = Platform.OS === 'web'
+      ? (typeof window !== 'undefined' ? `${window.location.origin}/auth/verified` : undefined)
+      : 'travel://auth/verified';
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { name },
+        emailRedirectTo: redirectTo,
       },
     });
     if (!error) {
