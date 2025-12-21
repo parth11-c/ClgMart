@@ -20,8 +20,11 @@ export type User = {
   email?: string;
 };
 
+export type Theme = 'dark' | 'light';
+
 export type StoreState = {
   currentUser: User;
-  posts: Product[]; // keeping name 'posts' in state to minimize refactor across UI
+  posts: Product[];
   users: Record<string, User>;
+  theme: Theme;
 };

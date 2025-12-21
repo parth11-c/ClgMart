@@ -1,16 +1,20 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Linking, Image as RNImage } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Linking, TextInput, Image as RNImage } from "react-native";
 import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "@/store";
 import { router } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 import { User } from "@/store/types";
+import { hapticManager } from "@/lib/sound";
+import * as Haptics from 'expo-haptics';
+import { colors } from "@/lib/colors";
 
 type Post = ReturnType<typeof useStore>["posts"][number];
 
 function PostCard({ item }: { item: Post }) {
-  const { getUser } = useStore();
+  const { getUser, theme } = useStore();
+  const t = colors[theme];
   const [seller, setSeller] = React.useState<User | undefined>(undefined);
 
   React.useEffect(() => {
@@ -22,6 +26,7 @@ function PostCard({ item }: { item: Post }) {
   }, [item.userId, getUser]);
 
   const handleWhatsApp = () => {
+    hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
     const message = `Hi, I'm interested in your product: ${item.title}`;
     const raw = seller?.phone?.trim();
     if (!raw) {
@@ -38,11 +43,16 @@ function PostCard({ item }: { item: Post }) {
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={() => router.push(`/post/${item.id}` as any)}>
-      <View style={styles.imageWrap}>
+    <TouchableOpacity
+      style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}
+      onPress={() => {
+        hapticManager.trigger('selection');
+        router.push(`/post/${item.id}` as any);
+      }}
+    >
+      <View style={[styles.imageWrap, { backgroundColor: t.background }]}>
         <Image source={{ uri: item.imageUri }} style={styles.image} contentFit="cover" transition={200} />
         <View style={styles.imageOverlay} />
-        <View style={styles.priceBadge}><Text style={styles.priceBadgeText}>₹{item.price?.toFixed?.(0) ?? item.price}</Text></View>
         {item.status === 'sold' && (
           <View style={styles.soldBadgeAcrossImage}>
             <Text style={styles.soldTextAcrossImage}>SOLD</Text>
@@ -50,22 +60,31 @@ function PostCard({ item }: { item: Post }) {
         )}
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.meta} numberOfLines={1}>{item.category} • {String(item.condition).toLowerCase()} condition</Text>
-        <View style={styles.sellerRow}>
+        <View style={styles.mainInfo}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={[styles.title, { color: t.text }]} numberOfLines={1}>{item.title}</Text>
+            <Text style={[styles.priceText, { color: t.success }]}>₹{item.price?.toFixed?.(0) ?? item.price}</Text>
+          </View>
+          {item.status !== 'sold' && (
+            <TouchableOpacity
+              onPress={handleWhatsApp}
+              style={styles.wpButton}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Ionicons name="logo-whatsapp" size={22} color={t.whatsappMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={[styles.sellerRow, { borderTopColor: t.borderSubtle }]}>
           {seller?.avatar ? (
             <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} contentFit="cover" />
           ) : (
-            <View style={styles.sellerAvatarPlaceholder} />
+            <View style={[styles.sellerAvatarPlaceholder, { backgroundColor: t.borderSubtle }]} />
           )}
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push(`/profile/${item.userId}` as any)}>
-            <Text style={styles.sellerName} numberOfLines={1}>{seller?.name || 'Seller'}</Text>
-          </TouchableOpacity>
-          {item.status !== 'sold' && (
-            <TouchableOpacity style={styles.wpIconBtn} onPress={handleWhatsApp} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="logo-whatsapp" size={14} color="#ffffff" />
-            </TouchableOpacity>
-          )}
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sellerName, { color: theme === 'dark' ? '#888' : t.textMuted }]} numberOfLines={1}>{seller?.name || 'Seller'}</Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -73,25 +92,78 @@ function PostCard({ item }: { item: Post }) {
 }
 
 export default function HomeScreen() {
-  const { posts } = useStore();
+  const { posts, theme } = useStore();
+  const t = colors[theme];
   const insets = useSafeAreaInsets();
+  const [isSearching, setIsSearching] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+
+  const filteredPosts = React.useMemo(() => {
+    if (!searchQuery.trim()) return posts;
+    return posts.filter((p: any) =>
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [posts, searchQuery]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {posts.length === 0 ? (
+    <SafeAreaView style={[styles.container, { backgroundColor: t.background }]} edges={['left', 'right']}>
+      {/* Minimal Search Button Area */}
+      <View style={[styles.headerActionRow, { backgroundColor: t.background }]}>
+        {!isSearching ? (
+          <TouchableOpacity
+            style={[styles.minimalSearchBtn, { backgroundColor: t.card, borderColor: theme === 'dark' ? '#1a1a1a' : t.borderSubtle }]}
+            onPress={() => {
+              hapticManager.trigger('selection');
+              setIsSearching(true);
+            }}
+          >
+            <Ionicons name="search" size={18} color={theme === 'dark' ? '#888' : t.textMuted} />
+            <Text style={[styles.searchPlaceholderText, { color: theme === 'dark' ? '#666' : t.textMuted }]}>Search...</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.activeSearchContainer, { backgroundColor: t.background, borderBottomColor: t.borderSubtle }]}>
+            <Ionicons name="search" size={18} color={t.primary} style={{ marginRight: 10 }} />
+            <TextInput
+              autoFocus
+              placeholder="Search..."
+              placeholderTextColor={t.textMuted}
+              style={[styles.activeSearchInput, { color: t.text }]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <TouchableOpacity
+              onPress={() => {
+                hapticManager.trigger('selection');
+                setIsSearching(false);
+                setSearchQuery("");
+              }}
+            >
+              <Ionicons name="close-circle" size={18} color={theme === 'dark' ? '#666' : t.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {filteredPosts.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Text style={styles.text}>No products yet. Be the first to list an item!</Text>
+          <Text style={styles.text}>
+            {searchQuery ? `No results for "${searchQuery}"` : "No products yet. Be the first to list an item!"}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={posts}
+          data={filteredPosts}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
+          numColumns={2}
+          columnWrapperStyle={styles.gridRow}
+          contentContainerStyle={[styles.list, { paddingBottom: 20 }]}
           renderItem={({ item }) => (<PostCard item={item as any} />)}
-          initialNumToRender={5}
-          maxToRenderPerBatch={5}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
           windowSize={5}
           removeClippedSubviews={true}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -99,37 +171,103 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0a" },
-  text: { color: "#fff", textAlign: "center" },
+  container: { flex: 1 },
+  text: { textAlign: "center", fontSize: 14, maxWidth: '80%' },
   emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  list: { padding: 12 },
-  card: {
-    backgroundColor: "#111",
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 12,
-    borderColor: "#222",
-    borderWidth: 1,
-    // subtle shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
+  list: { paddingHorizontal: 16, paddingTop: 4 },
+  gridRow: { justifyContent: 'space-between' },
+
+  headerActionRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  imageWrap: { position: 'relative' },
-  image: { width: "100%", height: 180, backgroundColor: "#222" },
-  imageOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.08)' },
-  priceBadge: { position: 'absolute', left: 8, bottom: 8, backgroundColor: 'rgba(10,10,10,0.85)', borderColor: 'rgba(255,255,255,0.12)', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  priceBadgeText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  cardBody: { padding: 12 },
-  title: { color: "#fff", fontSize: 16, fontWeight: "700", marginBottom: 2 },
-  meta: { color: "#aaa", fontSize: 12, marginBottom: 10 },
-  sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sellerAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
-  sellerAvatarPlaceholder: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
-  sellerName: { color: '#ddd', fontSize: 12, fontWeight: '600' },
-  wpIconBtn: { backgroundColor: '#111', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6, borderWidth: 1, borderColor: '#222' },
-  soldBadgeAcrossImage: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.85)', borderColor: '#ff4d4d', borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  soldTextAcrossImage: { color: '#ff4d4d', fontWeight: '900', fontSize: 14, letterSpacing: 1.5 },
+  minimalSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 42,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+  },
+  searchPlaceholderText: {
+    fontSize: 14,
+    marginLeft: 10,
+    fontWeight: '500',
+  },
+  activeSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 42,
+    borderBottomWidth: 1,
+    paddingHorizontal: 4,
+  },
+  activeSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+
+  // Card Styles Redesigned for Elegant Contained Look
+  card: {
+    width: '48%',
+    borderRadius: 24,
+    padding: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  imageWrap: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  image: { width: "100%", height: "100%" },
+  imageOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.06)' },
+
+  cardBody: {
+    paddingTop: 10,
+    paddingHorizontal: 2,
+    flex: 1,
+  },
+  mainInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  title: { fontSize: 13, fontWeight: "700", marginBottom: 2 },
+  priceText: { fontWeight: '800', fontSize: 14 },
+  wpButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    opacity: 0.9,
+    paddingTop: 8,
+    borderTopWidth: 1,
+  },
+  sellerAvatar: { width: 14, height: 14, borderRadius: 7, marginRight: 6 },
+  sellerAvatarPlaceholder: { width: 14, height: 14, borderRadius: 7, marginRight: 6 },
+  sellerName: { fontSize: 10, fontWeight: '500' },
+
+  soldBadgeAcrossImage: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    borderColor: '#ff4d4d',
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    zIndex: 10
+  },
+  soldTextAcrossImage: { color: '#ff4d4d', fontWeight: '900', fontSize: 8, letterSpacing: 0.5 },
+  wpIconBtn: { marginLeft: 'auto' },
 });

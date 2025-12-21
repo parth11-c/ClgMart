@@ -6,10 +6,14 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useStore } from "@/store";
 import { Ionicons } from '@expo/vector-icons';
 import { User } from "@/store/types";
+import { hapticManager } from "@/lib/sound";
+import * as Haptics from 'expo-haptics';
+import { colors } from "@/lib/colors";
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPost, getUser, currentUser, updatePostStatus } = useStore();
+  const { getPost, getUser, currentUser, updatePostStatus, theme } = useStore();
+  const t = colors[theme];
   const post = id ? getPost(id) : undefined;
   const isOwnPost = post?.userId === currentUser.id;
   const insets = useSafeAreaInsets();
@@ -66,8 +70,8 @@ export default function PostDetailScreen() {
 
   if (!post) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.muted}>Product not found.</Text>
+      <View style={[styles.center, { backgroundColor: t.background }]}>
+        <Text style={[styles.muted, { color: t.textMuted }]}>Product not found.</Text>
       </View>
     );
   }
@@ -137,7 +141,7 @@ export default function PostDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: t.background }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         {/* Image Gallery */}
         <View style={styles.imageContainer}>
@@ -151,11 +155,23 @@ export default function PostDetailScreen() {
 
           {/* Top icon bar over image */}
           <View style={styles.topImageBar}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.circleIconBtn}>
+            <TouchableOpacity
+              onPress={() => {
+                hapticManager.trigger('selection');
+                router.back();
+              }}
+              style={styles.circleIconBtn}
+            >
               <Ionicons name="chevron-back" size={18} color="#fff" />
             </TouchableOpacity>
             {!isOwnPost && post.status !== 'sold' && (
-              <TouchableOpacity onPress={handleShare} style={styles.circleIconBtn}>
+              <TouchableOpacity
+                onPress={() => {
+                  hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+                  handleShare();
+                }}
+                style={styles.circleIconBtn}
+              >
                 <Ionicons name="logo-whatsapp" size={16} color="#fff" />
               </TouchableOpacity>
             )}
@@ -169,8 +185,8 @@ export default function PostDetailScreen() {
             </View>
           )}
           {/* Floating price badge */}
-          <View style={styles.priceBadge}>
-            <Text style={styles.priceBadgeText}>₹{post.price?.toFixed(0) || '0'}</Text>
+          <View style={[styles.priceBadge, { backgroundColor: t.background + 'cc' }]}>
+            <Text style={[styles.priceBadgeText, { color: t.text }]}>₹{post.price?.toFixed(0) || '0'}</Text>
           </View>
           {/* Image Pagination Dots */}
           <View style={styles.imagePagination}>
@@ -189,20 +205,20 @@ export default function PostDetailScreen() {
         {/* Product Info */}
         <View style={styles.productHeader}>
           <View>
-            <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
-            <Text style={styles.category}>{post.category || 'General'}</Text>
+            <Text style={[styles.title, { color: t.text }]} numberOfLines={2}>{post.title}</Text>
+            <Text style={[styles.category, { color: theme === 'dark' ? '#a6b1b8' : t.textMuted }]}>{post.category || 'General'}</Text>
           </View>
         </View>
 
         {/* Price and chips */}
         <View style={styles.priceContainer}>
-          <Text style={styles.price}>₹{post.price?.toFixed(2) || '0.00'}</Text>
+          <Text style={[styles.price, { color: t.text }]}>₹{post.price?.toFixed(2) || '0.00'}</Text>
           <View style={styles.chipsRow}>
             {post.condition ? (
-              <View style={styles.chip}><Text style={styles.chipText}>{post.condition}</Text></View>
+              <View style={[styles.chip, { backgroundColor: t.success + '15' }]}><Text style={[styles.chipText, { color: t.success }]}>{post.condition}</Text></View>
             ) : null}
             {post.category ? (
-              <View style={styles.chipSecondary}><Text style={styles.chipSecondaryText}>{post.category}</Text></View>
+              <View style={[styles.chipSecondary, { backgroundColor: t.card, borderColor: t.border }]}><Text style={[styles.chipSecondaryText, { color: t.textMuted }]}>{post.category}</Text></View>
             ) : null}
           </View>
         </View>
@@ -212,38 +228,41 @@ export default function PostDetailScreen() {
 
         {/* Description */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Description</Text>
-          <View style={styles.card}>
-            <Text style={styles.description}>
+          <Text style={[styles.sectionTitle, { color: t.text }]}>Description</Text>
+          <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+            <Text style={[styles.description, { color: t.textMuted }]}>
               {post.description || 'No description provided.'}
             </Text>
           </View>
         </View>
 
         {/* Divider */}
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: t.borderSubtle }]} />
 
         {/* Seller Info */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Seller</Text>
+          <Text style={[styles.sectionTitle, { color: t.text }]}>Seller</Text>
           <TouchableOpacity
             activeOpacity={0.85}
-            style={styles.sellerCard}
-            onPress={() => router.push(`/profile/${post.userId}` as any)}
+            style={[styles.sellerCard, { backgroundColor: t.card, borderColor: t.border }]}
+            onPress={() => {
+              hapticManager.trigger('selection');
+              router.push(`/profile/${post.userId}` as any);
+            }}
           >
             {seller?.avatar ? (
               <Image source={{ uri: seller.avatar }} style={styles.sellerAvatarImage} contentFit="cover" />
             ) : (
-              <View style={styles.sellerAvatar}>
-                <Ionicons name="person" size={24} color="#aaa" />
+              <View style={[styles.sellerAvatar, { backgroundColor: t.background }]}>
+                <Ionicons name="person" size={24} color={t.textMuted} />
               </View>
             )}
             <View style={styles.sellerDetails}>
-              <Text style={styles.sellerName}>{seller?.name || 'Seller'}</Text>
-              <Text style={styles.sellerSub}>{maskPhone(seller?.phone) || 'WhatsApp not added'}</Text>
+              <Text style={[styles.sellerName, { color: t.text }]}>{seller?.name || 'Seller'}</Text>
+              <Text style={[styles.sellerSub, { color: t.textMuted }]}>{maskPhone(seller?.phone) || 'WhatsApp not added'}</Text>
             </View>
-            <View style={styles.viewProfileBtn}>
-              <Ionicons name="chevron-forward" size={18} color="#bbb" />
+            <View style={[styles.viewProfileBtn, { backgroundColor: theme === 'dark' ? '#0a0a0a' : t.background, borderColor: theme === 'dark' ? '#1f2329' : t.borderSubtle }]}>
+              <Ionicons name="chevron-forward" size={18} color={theme === 'dark' ? '#a6b1b8' : t.textMuted} />
             </View>
           </TouchableOpacity>
         </View>
@@ -251,17 +270,27 @@ export default function PostDetailScreen() {
         {/* Owner Controls */}
         {isOwnPost && (
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Manage Listing</Text>
+            <Text style={[styles.sectionTitle, { color: t.text }]}>Manage Listing</Text>
             <TouchableOpacity
-              style={[styles.soldToggleBtn, post.status === 'sold' ? styles.soldToggleBtnActive : undefined]}
-              onPress={toggleSold}
+              style={[
+                styles.soldToggleBtn,
+                { borderColor: post.status === 'sold' ? (theme === 'dark' ? '#555' : t.border) : t.danger },
+                post.status === 'sold' ? { backgroundColor: theme === 'dark' ? '#333' : t.card } : undefined
+              ]}
+              onPress={() => {
+                hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+                toggleSold();
+              }}
             >
               <Ionicons
                 name={post.status === 'sold' ? "checkmark-circle" : "close-circle-outline"}
                 size={20}
-                color={post.status === 'sold' ? "#fff" : "#ff4d4d"}
+                color={post.status === 'sold' ? t.success : t.danger}
               />
-              <Text style={[styles.soldToggleText, post.status === 'sold' ? styles.soldToggleTextActive : undefined]}>
+              <Text style={[
+                styles.soldToggleText,
+                { color: post.status === 'sold' ? (theme === 'dark' ? '#fff' : t.text) : t.danger }
+              ]}>
                 {post.status === 'sold' ? "Mark as Available" : "Mark as Sold"}
               </Text>
             </TouchableOpacity>
@@ -275,7 +304,6 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
   content: {
     paddingHorizontal: 16,
@@ -286,10 +314,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
   },
   muted: {
-    color: '#aaa',
     fontSize: 16,
   },
   imageContainer: {
@@ -297,7 +323,6 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#111',
     marginBottom: 16,
   },
   image: {
@@ -335,14 +360,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     bottom: 12,
-    backgroundColor: 'rgba(10,10,10,0.8)',
     borderColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
   },
-  priceBadgeText: { color: '#fff', fontWeight: '800' },
+  priceBadgeText: { fontWeight: '800' },
   imagePagination: {
     position: 'absolute',
     bottom: 16,
@@ -372,12 +396,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '800',
-    color: '#fff',
     marginBottom: 4,
   },
   category: {
     fontSize: 13,
-    color: '#a6b1b8',
   },
   shareButton: {
     padding: 8,
@@ -390,7 +412,6 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#fff',
     marginRight: 12,
   },
   chipsRow: {
@@ -398,38 +419,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    backgroundColor: '#132a17',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
     marginRight: 8,
   },
   chipText: {
-    color: '#7ddc7a',
     fontSize: 12,
     fontWeight: '500',
   },
   chipSecondary: {
-    backgroundColor: '#141414',
     borderWidth: 1,
-    borderColor: '#222',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
   },
   chipSecondaryText: {
-    color: '#bbb',
     fontSize: 12,
     fontWeight: '500',
   },
   conditionBadge: {
-    backgroundColor: '#132a17',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   conditionText: {
-    color: '#7ddc7a',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -442,13 +456,11 @@ const styles = StyleSheet.create({
   quantityLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#ddd',
   },
   quantitySelector: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#222',
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -456,19 +468,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#111',
     alignItems: 'center',
     justifyContent: 'center',
   },
   quantityButtonText: {
     fontSize: 20,
-    color: '#fff',
   },
   quantityText: {
     fontSize: 18,
     fontWeight: '500',
     marginHorizontal: 16,
-    color: '#fff',
   },
   sectionContainer: {
     marginTop: 12,
@@ -477,12 +486,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ddd',
     marginBottom: 8,
   },
   card: {
-    backgroundColor: '#0f0f0f',
-    borderColor: '#1e1e1e',
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
@@ -495,14 +501,10 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#151515',
-    borderBottomWidth: 1,
-    borderBottomColor: '#151515',
     marginVertical: 8,
   },
   description: {
     fontSize: 14,
-    color: '#bbb',
     lineHeight: 22,
   },
   sellerContainer: {
@@ -517,7 +519,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#111',
     marginRight: 12,
   },
   sellerAvatarImage: {
@@ -532,9 +533,7 @@ const styles = StyleSheet.create({
   sellerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0f0f0f',
     borderWidth: 1,
-    borderColor: '#1e1e1e',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -542,11 +541,9 @@ const styles = StyleSheet.create({
   sellerName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
     marginBottom: 2,
   },
   sellerSub: {
-    color: '#888',
     fontSize: 12,
   },
   sellerMetaRow: {
@@ -556,7 +553,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   sellerMetaText: {
-    color: '#9aa0a6',
     fontSize: 12,
   },
   viewProfileBtn: {
@@ -565,9 +561,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#111',
     borderWidth: 1,
-    borderColor: '#222',
   },
   sellerRating: {
     flexDirection: 'row',
@@ -575,7 +569,6 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     marginLeft: 4,
-    color: '#aaa',
     fontSize: 14,
   },
   soldOverlayBig: {
@@ -603,27 +596,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#ff4d4d',
     borderRadius: 12,
     paddingVertical: 14,
     marginTop: 8,
   },
-  soldToggleBtnActive: {
-    backgroundColor: '#333',
-    borderColor: '#555',
-  },
   soldToggleText: {
-    color: '#ff4d4d',
     fontWeight: '800',
     fontSize: 16,
   },
-  soldToggleTextActive: {
-    color: '#fff',
-  },
   showText: {
-    color: '#4da3ff',
     fontSize: 12,
     fontWeight: '700',
     textDecorationLine: 'underline',

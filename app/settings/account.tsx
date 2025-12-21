@@ -6,6 +6,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '@/store';
 import { router } from 'expo-router';
+import { hapticManager } from '@/lib/sound';
+import * as Haptics from 'expo-haptics';
 
 export default function AccountSettingsScreen() {
     const insets = useSafeAreaInsets();
@@ -18,6 +20,7 @@ export default function AccountSettingsScreen() {
     const [isSaving, setIsSaving] = useState(false);
 
     const pickImage = async () => {
+        hapticManager.trigger(Haptics.ImpactFeedbackStyle.Light);
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permission needed', 'We need photo library permission to pick an image.');
@@ -69,6 +72,7 @@ export default function AccountSettingsScreen() {
             if (!res.ok) {
                 Alert.alert('Error', res.reason || 'Failed to update profile.');
             } else {
+                hapticManager.trigger('success');
                 router.back();
             }
         } catch (e: any) {
@@ -80,6 +84,7 @@ export default function AccountSettingsScreen() {
 
     const confirmDeleteAccount = () => {
         const doDelete = async () => {
+            hapticManager.trigger(Haptics.ImpactFeedbackStyle.Heavy);
             const res = await deleteAccount();
             if (!res.ok) {
                 Alert.alert('Error', res.reason || 'Failed to delete account.');
@@ -89,14 +94,14 @@ export default function AccountSettingsScreen() {
         };
 
         if (Platform.OS === 'web') {
-            const ok = typeof window !== 'undefined' ? window.confirm('This will permanently delete your profile, posts, and associated images. This action cannot be undone.') : false;
+            const ok = typeof window !== 'undefined' ? window.confirm('This will permanently delete your profile, sells, and associated images. This action cannot be undone.') : false;
             if (ok) doDelete();
             return;
         }
 
         Alert.alert(
             'Delete account',
-            'This will permanently delete your profile, posts, and associated images. This action cannot be undone.',
+            'This will permanently delete your profile, sells, and associated images. This action cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Delete', style: 'destructive', onPress: doDelete },
@@ -107,8 +112,14 @@ export default function AccountSettingsScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                <TouchableOpacity
+                    onPress={() => {
+                        hapticManager.trigger('selection');
+                        router.back();
+                    }}
+                    style={styles.backBtn}
+                >
+                    <Ionicons name="chevron-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Account Settings</Text>
             </View>
@@ -127,12 +138,21 @@ export default function AccountSettingsScreen() {
                         )}
                         <View style={{ flex: 1 }}>
                             <View style={styles.avatarActionsRow}>
-                                <TouchableOpacity style={styles.btn} onPress={pickImage}>
+                                <TouchableOpacity
+                                    style={styles.btn}
+                                    onPress={pickImage}
+                                >
                                     <Ionicons name="image-outline" size={16} color="#4da3ff" />
                                     <Text style={styles.btnText}>Change Photo</Text>
                                 </TouchableOpacity>
                                 {avatarUri && (
-                                    <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={clearAvatar}>
+                                    <TouchableOpacity
+                                        style={[styles.btn, styles.btnDanger]}
+                                        onPress={() => {
+                                            hapticManager.trigger(Haptics.ImpactFeedbackStyle.Light);
+                                            clearAvatar();
+                                        }}
+                                    >
                                         <Ionicons name="trash-outline" size={16} color="#fff" />
                                         <Text style={styles.btnDangerText}>Remove</Text>
                                     </TouchableOpacity>
@@ -190,7 +210,10 @@ export default function AccountSettingsScreen() {
 
                     <TouchableOpacity
                         style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
-                        onPress={onSave}
+                        onPress={() => {
+                            hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+                            onSave();
+                        }}
                         disabled={isSaving}
                     >
                         {isSaving ? (
@@ -207,9 +230,15 @@ export default function AccountSettingsScreen() {
 
                 <View style={[styles.card, { borderColor: '#5e0000', backgroundColor: '#1a0505' }]}>
                     <Text style={styles.dangerText}>
-                        Deleting your account will permanently remove your profile, posts, and images. This action cannot be undone.
+                        Deleting your account will permanently remove your profile, sells, and images. This action cannot be undone.
                     </Text>
-                    <TouchableOpacity style={styles.deleteAccBtn} onPress={confirmDeleteAccount}>
+                    <TouchableOpacity
+                        style={styles.deleteAccBtn}
+                        onPress={() => {
+                            hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+                            confirmDeleteAccount();
+                        }}
+                    >
                         <Ionicons name="trash-outline" size={16} color="#fff" />
                         <Text style={styles.deleteAccBtnText}>Delete account permanently</Text>
                     </TouchableOpacity>

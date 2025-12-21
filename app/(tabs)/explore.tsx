@@ -18,6 +18,9 @@ import Animated, {
   interpolate,
   Extrapolation
 } from "react-native-reanimated";
+import { hapticManager } from "@/lib/sound";
+import * as Haptics from 'expo-haptics';
+import { colors } from "@/lib/colors";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH * 0.88;
@@ -44,6 +47,8 @@ function AnimatedCard({
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
 }) {
+  const { theme } = useStore();
+  const t = colors[theme];
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
@@ -96,19 +101,19 @@ function AnimatedCard({
   });
 
   const leftStampStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, -30], [0.8, 0], Extrapolation.CLAMP),
-    transform: [{ scale: interpolate(translateX.value, [-SWIPE_THRESHOLD, -30], [1, 0.5], Extrapolation.CLAMP) }]
+    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, -10], [1, 0], Extrapolation.CLAMP),
+    transform: [{ scale: interpolate(translateX.value, [-SWIPE_THRESHOLD, -10], [1.2, 0.8], Extrapolation.CLAMP) }]
   }));
 
   const rightStampStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [30, SWIPE_THRESHOLD], [0, 0.8], Extrapolation.CLAMP),
-    transform: [{ scale: interpolate(translateX.value, [30, SWIPE_THRESHOLD], [0.5, 1], Extrapolation.CLAMP) }]
+    opacity: interpolate(translateX.value, [10, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+    transform: [{ scale: interpolate(translateX.value, [10, SWIPE_THRESHOLD], [0.8, 1.2], Extrapolation.CLAMP) }]
   }));
 
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.card, animatedStyle]}>
-        <View style={styles.cardInner}>
+        <View style={[styles.cardInner, { backgroundColor: t.card, borderColor: t.border }]}>
           <Image
             source={{ uri: post.imageUri }}
             style={styles.cardImage}
@@ -126,16 +131,15 @@ function AnimatedCard({
               <Text style={styles.soldTextSmall}>SOLD</Text>
             </View>
           )}
-          <View style={styles.cardInfo}>
+          <View style={[styles.cardInfo, { backgroundColor: t.card }]}>
             <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle} numberOfLines={1}>{post.title}</Text>
+              <Text style={[styles.cardTitle, { color: t.text }]} numberOfLines={1}>{post.title}</Text>
               {post.price !== undefined && (
-                <Text style={styles.cardPrice}>₹{post.price}</Text>
+                <Text style={[styles.cardPrice, { color: t.success }]}>₹{post.price}</Text>
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={styles.cardMeta}>{post.category || 'General'}</Text>
-              <Ionicons name="heart" size={20} color="#ff4d4d" style={{ opacity: 0.1 }} />
+              <Text style={[styles.cardMeta, { color: theme === 'dark' ? '#aaa' : t.textMuted }]}>{post.category || 'General'}</Text>
             </View>
           </View>
         </View>
@@ -202,9 +206,9 @@ const SparkleBackground = () => {
 };
 
 const TopSwipeGuide = () => {
-  const opacity = useSharedValue(0.15);
+  const opacity = useSharedValue(0.4);
   React.useEffect(() => {
-    opacity.value = withRepeat(withTiming(0.4, { duration: 1200 }), -1, true);
+    opacity.value = withRepeat(withTiming(1.0, { duration: 1200 }), -1, true);
   }, []);
 
   const pulseStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
@@ -226,7 +230,8 @@ const TopSwipeGuide = () => {
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
-  const { posts } = useStore();
+  const { posts, theme } = useStore();
+  const t = colors[theme];
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [visiblePosts, setVisiblePosts] = React.useState<Post[]>([]);
 
@@ -247,37 +252,40 @@ export default function ExploreScreen() {
   }, [posts]);
 
   const handleSwipeLeft = () => {
+    hapticManager.trigger(Haptics.ImpactFeedbackStyle.Light);
     setCurrentIndex(prev => prev + 1);
   };
 
   const handleSwipeRight = () => {
     const currentPost = visiblePosts[currentIndex];
     if (currentPost) {
+      hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
       router.push(`/post/${currentPost.id}` as any);
       setTimeout(() => setCurrentIndex(prev => prev + 1), 600);
     }
   };
 
   const handleReset = () => {
+    hapticManager.trigger('selection');
     setCurrentIndex(0);
   };
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme === 'dark' ? '#020202' : t.background }]} edges={["top"]}>
         <TopSwipeGuide />
         <SparkleBackground />
         <View style={styles.cardStackContainer}>
           {visiblePosts.length === 0 || currentIndex >= visiblePosts.length ? (
             <View style={styles.emptyStack}>
-              <View style={styles.emptyIconCircle}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: theme === 'dark' ? '#111' : t.card, borderColor: theme === 'dark' ? '#222' : t.borderSubtle }]}>
                 <Ionicons name="sparkles-outline" size={48} color="#ffd166" />
               </View>
-              <Text style={styles.emptyTitle}>End of the Stack!</Text>
-              <Text style={styles.emptySubtitle}>You've seen everything we found for now. Check back later for more!</Text>
-              <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-                <Ionicons name="refresh" size={18} color="#000" />
-                <Text style={styles.resetBtnText}>Refresh Discover</Text>
+              <Text style={[styles.emptyTitle, { color: t.text }]}>End of the Stack!</Text>
+              <Text style={[styles.emptySubtitle, { color: theme === 'dark' ? '#555' : t.textMuted }]}>You've seen everything we found for now. Check back later for more!</Text>
+              <TouchableOpacity style={[styles.resetBtn, { backgroundColor: t.text }]} onPress={handleReset}>
+                <Ionicons name="refresh" size={18} color={t.background} />
+                <Text style={[styles.resetBtnText, { color: t.background }]}>Refresh Discover</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -302,7 +310,7 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020202" },
+  container: { flex: 1 },
   cardStackContainer: {
     flex: 1,
     alignItems: 'center',
@@ -319,17 +327,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 28,
     overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
     // noticeable border for deck effect
     borderWidth: 2,
-    borderColor: '#222',
   },
   cardImage: {
     flex: 1,
     backgroundColor: 'transparent',
   },
   cardInfo: {
-    backgroundColor: '#1a1a1a',
     padding: 24,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
@@ -349,18 +354,15 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#fff',
     flex: 1,
     marginRight: 10,
   },
   cardPrice: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#ff4d4d',
   },
   cardMeta: {
     fontSize: 14,
-    color: '#aaa',
     fontWeight: '600',
   },
   soldBadgeSmall: {
@@ -390,18 +392,15 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#111',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#222',
   },
-  emptyTitle: { color: "#fff", fontSize: 26, fontWeight: "900", textAlign: 'center' },
-  emptySubtitle: { color: "#555", fontSize: 16, marginTop: 12, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { fontSize: 26, fontWeight: "900", textAlign: 'center' },
+  emptySubtitle: { fontSize: 16, marginTop: 12, textAlign: 'center', lineHeight: 22 },
   resetBtn: {
     marginTop: 32,
-    backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -410,7 +409,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
   },
-  resetBtnText: { color: '#000', fontWeight: '800', fontSize: 16 },
+  resetBtnText: { fontWeight: '800', fontSize: 16 },
   topGuideContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -434,19 +433,25 @@ const styles = StyleSheet.create({
   },
   guideText: {
     color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
   },
   stampContainer: {
     position: 'absolute',
-    top: 50,
-    borderWidth: 4,
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    top: 60,
+    borderWidth: 6,
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     zIndex: 100,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    // shadow for legibility
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   stampLeft: {
     right: 20,
@@ -460,15 +465,15 @@ const styles = StyleSheet.create({
   },
   stampTextLeft: {
     color: '#ff4d4d',
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 3,
   },
   stampTextRight: {
     color: '#7ddc7a',
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 3,
   },
   sparkle: {
     position: 'absolute',

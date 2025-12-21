@@ -6,14 +6,26 @@ import { View, StyleSheet, Platform } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
+import { colors } from "@/lib/colors";
+import { useStore } from "@/store";
+
+function RootInner() {
+  const { theme } = useStore();
+  const t = colors[theme];
+
+  return (
+    <View style={[styles.container, { backgroundColor: t.background }]}>
+      <View style={styles.contentContainer}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </View>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   return (
     <StoreProvider>
-      <View style={styles.container}>
-        <View style={styles.contentContainer}>
-          <Stack screenOptions={{ headerShown: false }} />
-        </View>
-      </View>
+      <RootInner />
     </StoreProvider>
   );
 }

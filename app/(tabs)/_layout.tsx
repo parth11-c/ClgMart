@@ -1,19 +1,23 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { Tabs, usePathname } from "expo-router";
-import { FontAwesome } from "@expo/vector-icons";
+import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useStore } from "@/store";
+import { colors } from "@/lib/colors";
 import { supabase } from "@/lib/supabase";
+import { soundManager } from "@/lib/sound";
+import * as Haptics from 'expo-haptics';
 
 export default function TabsLayout() {
-  const { currentUser } = useStore();
+  const { currentUser, theme } = useStore();
+  const t = colors[theme];
   const [hasUnread, setHasUnread] = React.useState(false);
   const pathname = usePathname();
   const onMessagesScreen = pathname?.endsWith('/message');
 
   React.useEffect(() => {
     if (!currentUser.id) return;
-    const channel = supabase.channel(`tabs-unread-${currentUser.id}`)
+    const channel = supabase.channel(`tabs - unread - ${currentUser.id} `)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
         const m = payload.new as { recipient_id?: string };
         if (m?.recipient_id === currentUser.id && !onMessagesScreen) {
@@ -31,22 +35,28 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{
       headerShown: true,
-      headerStyle: { backgroundColor: "#0a0a0a", borderBottomColor: '#222', borderBottomWidth: 1 },
+      headerStyle: { backgroundColor: t.background, borderBottomColor: t.borderSubtle, borderBottomWidth: 1 },
       headerShadowVisible: false,
-      headerTitleStyle: { color: "#fff", marginVertical: 0 },
+      headerTitleStyle: { color: t.text, marginVertical: 0 },
       headerTitleAlign: 'center',
       headerTitleContainerStyle: { paddingVertical: 0 },
       headerLeftContainerStyle: { paddingVertical: 0 },
       headerRightContainerStyle: { paddingVertical: 0 },
       headerTitle: () => (
-        <Text style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>ClgMart</Text>
+        <Text style={{ color: t.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>ClgMart</Text>
       ),
-      headerTintColor: "#fff",
-      tabBarActiveTintColor: "#fff",
-      tabBarInactiveTintColor: "#888",
-      tabBarStyle: { backgroundColor: "#0a0a0a", borderTopColor: "#222" },
+      headerTintColor: t.text,
+      tabBarActiveTintColor: t.primary,
+      tabBarInactiveTintColor: t.textMuted,
+      tabBarStyle: { backgroundColor: t.background, borderTopColor: t.borderSubtle },
       tabBarHideOnKeyboard: false,
-    }}>
+    }}
+      screenListeners={{
+        tabPress: () => {
+          soundManager.play('click', 'selection');
+        },
+      }}
+    >
       <Tabs.Screen
         name="home"
         options={{
@@ -64,7 +74,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="post"
         options={{
-          title: "Post",
+          title: "Sell",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <FontAwesome name="plus-square" color={color} size={size} />,
         }}
       />

@@ -7,6 +7,9 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
+import { hapticManager } from "@/lib/sound";
+import * as Haptics from 'expo-haptics';
+import { colors } from "@/lib/colors";
 
 const CONDITIONS = [
   'New',
@@ -26,7 +29,8 @@ const CATEGORIES = [
 ];
 
 export default function PostScreen() {
-  const { createPost } = useStore();
+  const { createPost, theme } = useStore();
+  const t = colors[theme];
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -48,6 +52,7 @@ export default function PostScreen() {
   };
 
   const pickImage = async () => {
+    hapticManager.trigger(Haptics.ImpactFeedbackStyle.Light);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission needed", "We need photo library permission to pick an image.");
@@ -90,6 +95,7 @@ export default function PostScreen() {
       });
 
       if (res.ok) {
+        hapticManager.trigger('success');
         setTitle("");
         setDescription("");
         setPrice("");
@@ -110,17 +116,17 @@ export default function PostScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#0a0a0a' }}
+      style={{ flex: 1, backgroundColor: t.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={90}
     >
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.heading}>Sell an Item</Text>
+      <ScrollView style={[styles.container, { backgroundColor: t.background }]} contentContainerStyle={styles.content}>
+        <Text style={[styles.heading, { color: t.text }]}>Sell an Item</Text>
 
         {/* Image Upload */}
         <View style={styles.imageUploadContainer}>
           {imageUri ? (
-            <TouchableOpacity onPress={pickImage} style={styles.imagePreview}>
+            <TouchableOpacity onPress={pickImage} style={[styles.imagePreview, { backgroundColor: t.card }]}>
               <Image
                 source={{ uri: imageUri }}
                 style={styles.previewImage}
@@ -132,33 +138,33 @@ export default function PostScreen() {
               </View>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
-              <Ionicons name="camera" size={32} color="#666" />
-              <Text style={styles.addPhotoText}>Add Photo</Text>
+            <TouchableOpacity style={[styles.addPhotoButton, { backgroundColor: t.card, borderColor: t.borderSubtle }]} onPress={pickImage}>
+              <Ionicons name="camera" size={32} color={t.textMuted} />
+              <Text style={[styles.addPhotoText, { color: t.textMuted }]}>Add Photo</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Form Fields */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Item Name*</Text>
+          <Text style={[styles.label, { color: t.text }]}>Item Name*</Text>
           <TextInput
             placeholder="What are you selling?"
-            placeholderTextColor="#888"
-            style={styles.input}
+            placeholderTextColor={t.textMuted}
+            style={[styles.input, { backgroundColor: t.inputBg, color: t.text, borderColor: t.borderSubtle }]}
             value={title}
             onChangeText={setTitle}
           />
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Price*</Text>
-          <View style={styles.priceInputContainer}>
-            <View style={styles.currencyWrap}><Text style={styles.currencySymbol}>₹</Text></View>
+          <Text style={[styles.label, { color: t.text }]}>Price*</Text>
+          <View style={[styles.priceInputContainer, { backgroundColor: t.inputBg, borderColor: t.borderSubtle }]}>
+            <View style={[styles.currencyWrap, { backgroundColor: t.card, borderRightColor: t.borderSubtle }]}><Text style={[styles.currencySymbol, { color: t.textMuted }]}>₹</Text></View>
             <TextInput
               placeholder="0.00"
-              placeholderTextColor="#888"
-              style={[styles.input, styles.priceInput]}
+              placeholderTextColor={t.textMuted}
+              style={[styles.input, styles.priceInput, { color: t.text }]}
               keyboardType="decimal-pad"
               value={price}
               onChangeText={setPrice}
@@ -167,13 +173,27 @@ export default function PostScreen() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Condition*</Text>
+          <Text style={[styles.label, { color: t.text }]}>Condition*</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
             {CONDITIONS.map((cond) => {
               const selected = condition === cond;
               return (
-                <TouchableOpacity key={cond} onPress={() => setCondition(cond)} style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected]}>
-                  <Text style={selected ? styles.chipTextSelected : styles.chipTextUnselected}>{cond}</Text>
+                <TouchableOpacity
+                  key={cond}
+                  onPress={() => {
+                    hapticManager.trigger('selection');
+                    setCondition(cond);
+                  }}
+                  style={[
+                    styles.chip,
+                    { borderColor: selected ? t.text : t.borderSubtle },
+                    selected ? { backgroundColor: t.text } : { backgroundColor: t.card }
+                  ]}
+                >
+                  <Text style={[
+                    { fontWeight: '700' },
+                    selected ? { color: t.background } : { color: t.textMuted }
+                  ]}>{cond}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -181,13 +201,27 @@ export default function PostScreen() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Category*</Text>
+          <Text style={[styles.label, { color: t.text }]}>Category*</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
             {CATEGORIES.map((cat) => {
               const selected = category === cat;
               return (
-                <TouchableOpacity key={cat} onPress={() => setCategory(cat)} style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected]}>
-                  <Text style={selected ? styles.chipTextSelected : styles.chipTextUnselected}>{cat}</Text>
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => {
+                    hapticManager.trigger('selection');
+                    setCategory(cat);
+                  }}
+                  style={[
+                    styles.chip,
+                    { borderColor: selected ? t.text : t.borderSubtle },
+                    selected ? { backgroundColor: t.text } : { backgroundColor: t.card }
+                  ]}
+                >
+                  <Text style={[
+                    { fontWeight: '700' },
+                    selected ? { color: t.background } : { color: t.textMuted }
+                  ]}>{cat}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -195,11 +229,11 @@ export default function PostScreen() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Description (optional)</Text>
+          <Text style={[styles.label, { color: t.text }]}>Description (optional)</Text>
           <TextInput
             placeholder="Include details like size, brand, color, etc."
-            placeholderTextColor="#888"
-            style={[styles.input, styles.textArea]}
+            placeholderTextColor={t.textMuted}
+            style={[styles.input, styles.textArea, { backgroundColor: t.inputBg, color: t.text, borderColor: t.borderSubtle }]}
             multiline
             numberOfLines={4}
             value={description}
@@ -208,11 +242,18 @@ export default function PostScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
-          onPress={onSubmit}
+          style={[
+            styles.submitButton,
+            { backgroundColor: t.text, borderColor: t.borderSubtle },
+            isLoading && { opacity: 0.5 }
+          ]}
+          onPress={() => {
+            hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+            onSubmit();
+          }}
           disabled={isLoading}
         >
-          <Text style={styles.submitButtonText}>{isLoading ? 'Posting…' : 'Post Item'}</Text>
+          <Text style={[styles.submitButtonText, { color: t.background }]}>{isLoading ? 'Selling…' : 'Sell Item'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -220,9 +261,9 @@ export default function PostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0a" },
+  container: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
-  heading: { fontSize: 22, fontWeight: '700', marginBottom: 24, color: '#fff' },
+  heading: { fontSize: 22, fontWeight: '700', marginBottom: 24 },
   imageUploadContainer: {
     marginBottom: 24,
     alignItems: 'center',
@@ -231,16 +272,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 180,
     borderWidth: 1,
-    borderColor: '#222',
     borderStyle: 'dashed',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111',
   },
   addPhotoText: {
     marginTop: 8,
-    color: '#aaa',
     fontSize: 16,
   },
   imagePreview: {
@@ -248,7 +286,6 @@ const styles = StyleSheet.create({
     height: 400,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#111',
   },
   previewImage: {
     width: '100%',
@@ -277,29 +314,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#ddd',
   },
   input: {
-    backgroundColor: '#111',
     borderWidth: 1,
-    borderColor: '#222',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    color: '#fff',
   },
   priceInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
     borderWidth: 1,
-    borderColor: '#222',
     borderRadius: 10,
     overflow: 'hidden',
     height: 48,
   },
-  currencyWrap: { paddingHorizontal: 14, height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616', borderRightWidth: 1, borderRightColor: '#222' },
-  currencySymbol: { fontSize: 16, color: '#aaa' },
+  currencyWrap: { paddingHorizontal: 14, height: '100%', alignItems: 'center', justifyContent: 'center', borderRightWidth: 1 },
+  currencySymbol: { fontSize: 16 },
   priceInput: {
     flex: 1,
     borderWidth: 0,
@@ -309,23 +340,17 @@ const styles = StyleSheet.create({
   },
   chipsRow: { gap: 10 },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
-  chipSelected: { backgroundColor: '#fff', borderColor: '#fff' },
-  chipUnselected: { backgroundColor: '#111', borderColor: '#222' },
-  chipTextSelected: { color: '#0a0a0a', fontWeight: '700' },
-  chipTextUnselected: { color: '#ddd', fontWeight: '600' },
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
   },
-  submitButton: { backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20, borderWidth: 1, borderColor: '#e5e5e5' },
-  submitButtonDisabled: { backgroundColor: '#e5e5e5' },
-  submitButtonText: { color: '#0a0a0a', fontSize: 16, fontWeight: '800' },
+  submitButton: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20, borderWidth: 1 },
+  submitButtonText: { fontSize: 16, fontWeight: '800' },
   row: {
     flexDirection: 'row'
   },
   half: {
     flex: 1
   },
-})
-  ;
+});
 

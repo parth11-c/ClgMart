@@ -5,6 +5,7 @@ import { useStore } from "@/store";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { colors } from "@/lib/colors";
 
 type ChatMessage = {
   id: string;
@@ -24,7 +25,8 @@ type Conversation = {
 
 export default function MessagesTab() {
   const insets = useSafeAreaInsets();
-  const { currentUser } = useStore();
+  const { currentUser, theme } = useStore();
+  const t = colors[theme];
   const myId = currentUser.id;
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -58,7 +60,7 @@ export default function MessagesTab() {
       const conversations: Conversation[] = peers.map(pid => ({ peerId: pid, lastMessage: map.get(pid)!, peer: profiles[pid] || null }));
       setItems(conversations);
     } catch (e) {
-     } finally {
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -89,7 +91,7 @@ export default function MessagesTab() {
           return next;
         });
 
-         const hasPeer = items.some(c => c.peerId === other && c.peer);
+        const hasPeer = items.some(c => c.peerId === other && c.peer);
         if (!hasPeer && !fetchingPeersRef.current.has(other)) {
           fetchingPeersRef.current.add(other);
           try {
@@ -107,44 +109,44 @@ export default function MessagesTab() {
   }, [myId, load]);
 
   const onRefresh = () => { setRefreshing(true); load(); };
-
   const renderItem = ({ item }: { item: Conversation }) => {
     const { peer, peerId, lastMessage } = item;
     const mine = lastMessage.sender_id === myId;
     const previewPrefix = mine ? 'You: ' : '';
     const time = new Date(lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     return (
-      <TouchableOpacity style={styles.row} onPress={() => router.push(`/message/${peerId}` as any)}>
+      <TouchableOpacity style={[styles.row, { borderBottomColor: theme === 'dark' ? '#151515' : t.borderSubtle }]} onPress={() => router.push(`/message/${peerId}` as any)}>
         {peer?.avatar_url ? (
           <Image source={{ uri: peer.avatar_url }} style={styles.avatar} />
         ) : (
-          <View style={styles.avatar} />
+          <View style={[styles.avatar, { backgroundColor: theme === 'dark' ? '#222' : t.card }]} />
         )}
         <View style={{ flex: 1 }}>
           <View style={styles.topRow}>
-            <Text style={styles.name} numberOfLines={1}>{peer?.name || 'User'}</Text>
-            <Text style={styles.time}>{time}</Text>
+            <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>{peer?.name || 'User'}</Text>
+            <Text style={[styles.time, { color: theme === 'dark' ? '#888' : t.textMuted }]}>{time}</Text>
           </View>
-          <Text style={styles.preview} numberOfLines={1}>{previewPrefix}{lastMessage.body}</Text>
+          <Text style={[styles.preview, { color: theme === 'dark' ? '#aaa' : t.textMuted }]} numberOfLines={1}>{previewPrefix}{lastMessage.body}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color="#777" />
+        <Ionicons name="chevron-forward" size={16} color={theme === 'dark' ? '#777' : t.border} />
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.header}> 
-        <Text style={styles.headerTitle}>Messages</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: t.background }]} edges={[]}>
+      <View style={[styles.header, { borderBottomColor: theme === 'dark' ? '#181818' : t.borderSubtle }]}>
+        <Text style={[styles.headerTitle, { color: t.text }]}>Messages</Text>
       </View>
       <FlatList
         data={items}
         keyExtractor={(it) => it.peerId}
         renderItem={renderItem}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 16 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.text} />}
         ListEmptyComponent={!loading ? (
-          <View style={styles.empty}><Text style={styles.emptyText}>No conversations yet.</Text></View>
+          <View style={styles.empty}><Text style={[styles.emptyText, { color: t.textMuted }]}>No conversations yet.</Text></View>
         ) : null}
       />
     </SafeAreaView>
@@ -152,16 +154,16 @@ export default function MessagesTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0a" },
-  header: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: '#181818' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  container: { flex: 1 },
+  header: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 18, fontWeight: '800' },
   list: { paddingHorizontal: 12, paddingTop: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#151515' },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#222', marginRight: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1 },
+  avatar: { width: 42, height: 42, borderRadius: 21, marginRight: 2 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  name: { color: '#fff', fontWeight: '700', flex: 1, marginRight: 8 },
-  time: { color: '#888', fontSize: 12 },
-  preview: { color: '#aaa', fontSize: 12 },
+  name: { fontWeight: '700', flex: 1, marginRight: 8 },
+  time: { fontSize: 12 },
+  preview: { fontSize: 12 },
   empty: { paddingTop: 80, alignItems: 'center' },
-  emptyText: { color: '#888' },
+  emptyText: {},
 });

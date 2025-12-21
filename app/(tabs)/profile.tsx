@@ -6,24 +6,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from "@/store";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { hapticManager } from "@/lib/sound";
+import * as Haptics from 'expo-haptics';
+import { colors } from "@/lib/colors";
 
 export default function ProfileScreen() {
-  const { currentUser, userPosts, deletePost } = useStore();
+  const { currentUser, userPosts, deletePost, theme } = useStore();
+  const t = colors[theme];
   const posts = userPosts(currentUser.id);
 
   /* ... skipping formatPhone ... */
 
   const confirmDelete = (postId: string) => {
     Alert.alert(
-      'Delete post',
-      'Are you sure you want to delete this post? This action cannot be undone.',
+      'Delete sell',
+      'Are you sure you want to delete this sell? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete', style: 'destructive', onPress: async () => {
             const res = await deletePost(postId);
-            if (!res.ok) {
-              Alert.alert('Error', res.reason || 'Failed to delete post.');
+            if (res.ok) {
+              hapticManager.trigger(Haptics.ImpactFeedbackStyle.Heavy);
+            } else {
+              Alert.alert('Error', res.reason || 'Failed to delete sell.');
             }
           }
         },
@@ -47,31 +53,49 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: t.background }]}>
       <View style={styles.header}>
         {currentUser?.avatar ? (
           <Image source={{ uri: currentUser.avatar }} style={styles.avatar} contentFit="cover" />
         ) : (
-          <View style={styles.avatar} />
+          <View style={[styles.avatar, { backgroundColor: t.card }]} />
         )}
         <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{currentUser.name}</Text>
-          {currentUser.email && <Text style={{ color: '#aaa', fontSize: 13, marginTop: 2 }}>{currentUser.email}</Text>}
+          <Text style={[styles.name, { color: t.text }]}>{currentUser.name}</Text>
+          {currentUser.email && <Text style={{ color: t.textMuted, fontSize: 13, marginTop: 2 }}>{currentUser.email}</Text>}
         </View>
-        <TouchableOpacity onPress={() => router.push('/settings' as any)} style={{ padding: 8 }}>
-          <Ionicons name="settings-outline" size={24} color="#fff" />
+        <TouchableOpacity
+          onPress={() => {
+            hapticManager.trigger('selection');
+            router.push('/settings' as any);
+          }}
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="settings-outline" size={24} color={t.text} />
         </TouchableOpacity>
       </View>
 
       {/* Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/profile/edit' as any)}>
-          <Ionicons name="create-outline" size={16} color="#4da3ff" />
-          <Text style={styles.editBtnText}>Edit profile</Text>
+        <TouchableOpacity
+          style={[styles.editBtn, { backgroundColor: theme === 'dark' ? '#0f1b28' : '#f0f7ff', borderColor: theme === 'dark' ? '#2a5b86' : t.primary }]}
+          onPress={() => {
+            hapticManager.trigger('selection');
+            router.push('/profile/edit' as any);
+          }}
+        >
+          <Ionicons name="create-outline" size={16} color={t.primary} />
+          <Text style={[styles.editBtnText, { color: t.primary }]}>Edit profile</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.wpBtn} onPress={openWhatsApp}>
-          <Ionicons name="logo-whatsapp" size={16} color="#1f3124" />
-          <Text style={styles.wpBtnText}>WhatsApp</Text>
+        <TouchableOpacity
+          style={[styles.wpBtn, { backgroundColor: t.whatsapp, borderColor: theme === 'dark' ? '#199e4d' : '#2ecc71' }]}
+          onPress={() => {
+            hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+            openWhatsApp();
+          }}
+        >
+          <Ionicons name="logo-whatsapp" size={16} color={theme === 'dark' ? '#1f3124' : '#fff'} />
+          <Text style={[styles.wpBtnText, { color: theme === 'dark' ? '#1f3124' : '#fff' }]}>WhatsApp</Text>
         </TouchableOpacity>
       </View>
 
@@ -84,9 +108,9 @@ export default function ProfileScreen() {
 
       {/* Contact number hidden as requested */}
 
-      <Text style={styles.section}>Your products</Text>
+      <Text style={[styles.section, { color: t.text }]}>Your products</Text>
       {posts.length === 0 ? (
-        <Text style={styles.muted}>No posts yet.</Text>
+        <Text style={[styles.muted, { color: theme === 'dark' ? '#9aa0a6' : t.textMuted }]}>No sells yet.</Text>
       ) : (
         <FlatList
           key={'grid-2'}
@@ -94,13 +118,19 @@ export default function ProfileScreen() {
           keyExtractor={(item) => item.id}
           numColumns={2}
           columnWrapperStyle={styles.gridRow}
-          contentContainerStyle={[styles.gridContent, { paddingBottom: 80 }]}
+          contentContainerStyle={[styles.gridContent, { paddingBottom: 20 }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => router.push(`/post/${item.id}` as any)}
-              onLongPress={() => confirmDelete(item.id)}
+              style={[styles.gridItem, { backgroundColor: t.card, borderColor: t.borderSubtle }]}
+              onPress={() => {
+                hapticManager.trigger('selection');
+                router.push(`/post/${item.id}` as any);
+              }}
+              onLongPress={() => {
+                hapticManager.trigger(Haptics.ImpactFeedbackStyle.Heavy);
+                confirmDelete(item.id);
+              }}
             >
               <Image source={{ uri: item.imageUri }} style={styles.gridImage} contentFit="cover" transition={200} />
               {item.status === 'sold' && (
@@ -110,10 +140,13 @@ export default function ProfileScreen() {
               )}
               <TouchableOpacity
                 style={styles.deleteBtn}
-                onPress={() => confirmDelete(item.id)}
+                onPress={() => {
+                  hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+                  confirmDelete(item.id);
+                }}
                 hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
               >
-                <View style={styles.deleteBtnBg}>
+                <View style={[styles.deleteBtnBg, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
                   <Ionicons name="close" size={14} color="#fff" />
                 </View>
               </TouchableOpacity>
@@ -126,25 +159,27 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0a", paddingHorizontal: 12, paddingTop: 1 },
+  container: { flex: 1, paddingHorizontal: 12, paddingTop: 1 },
   header: { flexDirection: "row", alignItems: "center", marginBottom: 6, marginTop: 16 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#444", marginRight: 12 },
-  name: { color: "#fff", fontSize: 20, fontWeight: "800", marginBottom: 2 },
-  sub: { color: "#aaa" },
-  section: { color: "#fff", fontSize: 16, fontWeight: "600", marginTop: 8, marginBottom: 6 },
-  muted: { color: "#9aa0a6" },
-  card: { backgroundColor: "#111", borderColor: "#222", borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 8 },
-  cardTitle: { color: "#fff", fontWeight: "600", marginBottom: 4 },
-  mutedSmall: { color: "#888", fontSize: 12 },
+  avatar: { width: 64, height: 64, borderRadius: 32, marginRight: 12 },
+  name: { fontSize: 20, fontWeight: "800", marginBottom: 2 },
+  sub: { opacity: 0.7 },
+  section: { fontSize: 16, fontWeight: "600", marginTop: 8, marginBottom: 6 },
+  muted: { opacity: 0.6 },
+  card: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 8 },
+  cardTitle: { fontWeight: "600", marginBottom: 4 },
+  mutedSmall: { fontSize: 12 },
   actions: { marginBottom: 16, gap: 10 },
-  editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#0f1b28', borderWidth: 1, borderColor: '#2a5b86', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
-  editBtnText: { color: '#4da3ff', fontWeight: '700' },
+  editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderWidth: 1, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
+  editBtnText: { fontWeight: '700' },
   phoneRow: { marginBottom: 14 },
-  contactCard: { backgroundColor: '#111', borderColor: '#222', borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 },
-  phonePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: '#121417', borderWidth: 1, borderColor: '#1f2329', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, marginTop: 6 },
-  phoneText: { color: '#a6b1b8', fontSize: 13, fontWeight: '600' },
-  wpBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#25D366', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#199e4d' },
-  wpBtnText: { color: '#1f3124', fontWeight: '800' },
+  contactCard: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 },
+  countBadge: { borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  countBadgeText: { fontSize: 12, fontWeight: '700' },
+  phonePill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderWidth: 1, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, marginTop: 6 },
+  phoneText: { fontSize: 13, fontWeight: '600' },
+  wpBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
+  wpBtnText: { fontWeight: '800' },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#c0392b', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#9e2f23' },
   logoutBtnText: { color: '#fff', fontWeight: '800' },
   deleteAccBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#8b0000', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#5e0000' },
@@ -154,8 +189,6 @@ const styles = StyleSheet.create({
   gridContent: { paddingTop: 8 },
   gridRow: { justifyContent: 'space-between', marginBottom: 8 },
   gridItem: {
-    backgroundColor: '#111',
-    borderColor: '#222',
     borderWidth: 1,
     borderRadius: 10,
     overflow: 'hidden',
@@ -169,7 +202,6 @@ const styles = StyleSheet.create({
     right: 6,
   },
   deleteBtnBg: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 12,
     width: 24,
     height: 24,

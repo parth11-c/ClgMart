@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { Platform } from 'react-native';
 import type { Product, StoreState, User } from './types';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const POSTS_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_POSTS_BUCKET || 'post-images';
 const AVATARS_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_AVATARS_BUCKET || 'avatars';
@@ -27,6 +28,7 @@ type StoreContextType = StoreState & {
   deleteAccount: () => Promise<{ ok: true } | { ok: false; reason: string }>;
   getUser: (userId: string) => Promise<User | undefined>;
   updatePostStatus: (postId: string, status: 'active' | 'sold') => Promise<{ ok: true } | { ok: false; reason: string }>;
+  setTheme: (theme: 'dark' | 'light') => Promise<void>;
 };
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -40,7 +42,27 @@ export const useStore = () => {
 };
 
 export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
-  const [state, setState] = useState<StoreState>({ currentUser: { id: '', name: '' }, posts: [], users: {} });
+  const [state, setState] = useState<StoreState>({
+    currentUser: { id: '', name: '' },
+    posts: [],
+    users: {},
+    theme: 'dark'
+  });
+
+  const setTheme = async (theme: 'dark' | 'light') => {
+    setState(prev => ({ ...prev, theme }));
+    await AsyncStorage.setItem('clgmart_theme', theme);
+  };
+
+  useEffect(() => {
+    const loadTheme = async () => {
+      const storedTheme = await AsyncStorage.getItem('clgmart_theme');
+      if (storedTheme === 'light' || storedTheme === 'dark') {
+        setState(prev => ({ ...prev, theme: storedTheme as 'dark' | 'light' }));
+      }
+    };
+    loadTheme();
+  }, []);
 
   const getUser: StoreContextType['getUser'] = useCallback(async (userId: string) => {
     if (state.users[userId]) return state.users[userId];
@@ -499,6 +521,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     deleteAccount,
     getUser,
     updatePostStatus,
+    setTheme,
   }), [state, getUser, userPosts, getPost, loadSession, loadPosts]);
 
   return (

@@ -127,7 +127,7 @@ export default function NotificationSettingsScreen() {
                 <View style={styles.card}>
                     <View style={[styles.row, { opacity: pauseAll ? 0.5 : 1 }]}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.label}>New post recommendations</Text>
+                            <Text style={styles.label}>New sell recommendations</Text>
                             <Text style={styles.subLabel}>Notify me about new items in my college</Text>
                         </View>
                         <Switch

@@ -7,10 +7,12 @@ import { useStore } from "@/store";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { User } from "@/store/types";
+import { colors } from "@/lib/colors";
 
 export default function UserProfileViewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { userPosts, getUser, currentUser } = useStore();
+  const { userPosts, getUser, currentUser, theme } = useStore();
+  const t = colors[theme];
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = React.useState<User | undefined>(undefined);
   const isOwnProfile = id === currentUser.id;
@@ -53,8 +55,8 @@ export default function UserProfileViewScreen() {
 
   if (!id) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.muted}>No user specified.</Text>
+      <View style={[styles.center, { backgroundColor: t.background }]}>
+        <Text style={[styles.muted, { color: t.textMuted }]}>No user specified.</Text>
       </View>
     );
   }
@@ -86,20 +88,20 @@ export default function UserProfileViewScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.headerCard}>
+    <SafeAreaView style={[styles.container, { backgroundColor: t.background }]}>
+      <View style={[styles.headerCard, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={styles.header}>
           {profile?.avatar ? (
             <Image source={{ uri: profile.avatar }} style={styles.avatarImage} contentFit="cover" />
           ) : (
-            <View style={styles.avatar} />
+            <View style={[styles.avatar, { backgroundColor: t.background }]} />
           )}
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{profile?.name || 'User'}</Text>
+            <Text style={[styles.name, { color: t.text }]}>{profile?.name || 'User'}</Text>
             <View style={{ gap: 2 }}>
-              {profile?.email && <Text style={styles.sub}>{maskEmail(profile.email)}</Text>}
-              {profile?.phone && <Text style={styles.sub}>{maskPhone(profile.phone)}</Text>}
-              {!profile?.email && !profile?.phone && <Text style={styles.sub}>No contact info</Text>}
+              {profile?.email && <Text style={[styles.sub, { color: t.textMuted }]}>{maskEmail(profile.email)}</Text>}
+              {profile?.phone && <Text style={[styles.sub, { color: t.textMuted }]}>{maskPhone(profile.phone)}</Text>}
+              {!profile?.email && !profile?.phone && <Text style={[styles.sub, { color: t.textMuted }]}>No contact info</Text>}
             </View>
           </View>
         </View>
@@ -107,25 +109,22 @@ export default function UserProfileViewScreen() {
         {/* Actions (match profile page but Edit -> Message) */}
         {!isOwnProfile && (
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.editBtn} onPress={() => router.push(`/message/${id}` as any)}>
-              <Ionicons name="chatbubble-ellipses" size={16} color="#4da3ff" />
-              <Text style={styles.editBtnText}>Message</Text>
+            <TouchableOpacity style={[styles.editBtn, { backgroundColor: theme === 'dark' ? '#0f1b28' : '#f0f7ff', borderColor: theme === 'dark' ? '#2a5b86' : t.primary }]} onPress={() => router.push(`/message/${id}` as any)}>
+              <Ionicons name="chatbubble-ellipses" size={16} color={t.primary} />
+              <Text style={[styles.editBtnText, { color: t.primary }]}>Message</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.wpBtn} onPress={handleWhatsApp}>
-              <Ionicons name="logo-whatsapp" size={16} color="#1f3124" />
-              <Text style={styles.wpBtnText}>WhatsApp</Text>
+            <TouchableOpacity style={[styles.wpBtn, { backgroundColor: t.whatsapp, borderColor: theme === 'dark' ? '#199e4d' : '#2ecc71' }]} onPress={handleWhatsApp}>
+              <Ionicons name="logo-whatsapp" size={16} color={theme === 'dark' ? '#1f3124' : '#fff'} />
+              <Text style={[styles.wpBtnText, { color: theme === 'dark' ? '#1f3124' : '#fff' }]}>WhatsApp</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: t.borderSubtle, borderBottomColor: t.borderSubtle }]} />
 
-      <View style={styles.sectionRow}>
-        <Text style={styles.section}>Products</Text>
-        <View style={styles.countBadge}><Text style={styles.countBadgeText}>{posts.length}</Text></View>
-      </View>
+      <Text style={[styles.section, { color: t.text }]}>Products</Text>
       {posts.length === 0 ? (
-        <Text style={styles.muted}>No posts yet.</Text>
+        <Text style={[styles.muted, { color: theme === 'dark' ? '#9aa0a6' : t.textMuted }]}>No posts yet.</Text>
       ) : (
         <FlatList
           key={'grid-2'}
@@ -136,7 +135,7 @@ export default function UserProfileViewScreen() {
           contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.gridItem} onPress={() => router.push(`/post/${item.id}` as any)}>
+            <TouchableOpacity style={[styles.gridItem, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => router.push(`/post/${item.id}` as any)}>
               <Image source={{ uri: item.imageUri }} style={styles.gridImage} contentFit="cover" transition={200} />
               {item.status === 'sold' && (
                 <View style={styles.soldBadgeSmall}>
@@ -144,9 +143,9 @@ export default function UserProfileViewScreen() {
                 </View>
               )}
               <View style={styles.gridFooter}>
-                <Text style={styles.gridTitle} numberOfLines={1}>{(item as any).title || 'Product'}</Text>
+                <Text style={[styles.gridTitle, { color: t.text }]} numberOfLines={1}>{(item as any).title || 'Product'}</Text>
                 {!!(item as any).price && (
-                  <Text style={styles.gridPrice}>₹{Number((item as any).price).toFixed(0)}</Text>
+                  <Text style={[styles.gridPrice, { color: t.success }]}>₹{Number((item as any).price).toFixed(0)}</Text>
                 )}
               </View>
             </TouchableOpacity>
@@ -158,11 +157,9 @@ export default function UserProfileViewScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0a", padding: 16 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0a0a0a" },
+  container: { flex: 1, padding: 16 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerCard: {
-    backgroundColor: '#0f0f0f',
-    borderColor: '#1e1e1e',
     borderWidth: 1,
     borderRadius: 14,
     padding: 12,
@@ -175,27 +172,25 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   header: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#444", marginRight: 12 },
+  avatar: { width: 64, height: 64, borderRadius: 32, marginRight: 12 },
   avatarImage: { width: 64, height: 64, borderRadius: 32, marginRight: 12 },
-  name: { color: "#fff", fontSize: 20, fontWeight: "800", marginBottom: 2 },
-  sub: { color: "#aaa" },
-  section: { color: "#fff", fontSize: 16, fontWeight: "600", marginTop: 8, marginBottom: 6 },
-  muted: { color: "#9aa0a6" },
-  card: { backgroundColor: "#111", borderColor: "#222", borderWidth: 1, borderRadius: 10, padding: 16, marginBottom: 8 },
-  cardTitle: { color: "#fff", fontWeight: "600", marginBottom: 4 },
-  mutedSmall: { color: "#888", fontSize: 12 },
+  name: { fontSize: 20, fontWeight: "800", marginBottom: 2 },
+  sub: { fontSize: 13 },
+  section: { fontSize: 16, fontWeight: "600", marginTop: 8, marginBottom: 6 },
+  muted: { fontSize: 14 },
+  card: { borderWidth: 1, borderRadius: 10, padding: 16, marginBottom: 8 },
+  cardTitle: { fontWeight: "600", marginBottom: 4 },
+  mutedSmall: { fontSize: 12 },
   actions: { gap: 10 },
-  divider: { height: 1, backgroundColor: '#141414', borderBottomColor: '#1f1f1f', borderBottomWidth: 1, marginVertical: 8 },
+  divider: { height: 1, borderBottomWidth: 1, marginVertical: 8 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 6 },
-  countBadge: { backgroundColor: '#121417', borderColor: '#1f2329', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
-  countBadgeText: { color: '#a6b1b8', fontSize: 12, fontWeight: '700' },
-  editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#0f1b28', borderWidth: 1, borderColor: '#2a5b86', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
-  editBtnText: { color: '#4da3ff', fontWeight: '700' },
+  countBadge: { borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  countBadgeText: { fontSize: 12, fontWeight: '700' },
+  editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderWidth: 1, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
+  editBtnText: { fontWeight: '700' },
   gridContent: { paddingTop: 8 },
   gridRow: { justifyContent: 'space-between', marginBottom: 8 },
   gridItem: {
-    backgroundColor: '#111',
-    borderColor: '#222',
     borderWidth: 1,
     borderRadius: 10,
     overflow: 'hidden',
@@ -209,14 +204,13 @@ const styles = StyleSheet.create({
   },
   gridImage: { width: '100%', aspectRatio: 1 },
   gridFooter: { paddingHorizontal: 8, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  gridTitle: { color: '#eee', fontSize: 12, flex: 1, marginRight: 6, fontWeight: '600' },
-  gridPrice: { color: '#7ddc7a', fontSize: 12, fontWeight: '800' },
-  wpBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#25D366', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#199e4d' },
-  wpBtnText: { color: '#1f3124', fontWeight: '800' },
+  gridTitle: { fontSize: 12, flex: 1, marginRight: 6, fontWeight: '600' },
+  gridPrice: { fontSize: 12, fontWeight: '800' },
+  wpBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
+  wpBtnText: { fontWeight: '800' },
   soldBadgeSmall: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.85)', borderColor: '#ff4d4d', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   soldTextSmall: { color: '#ff4d4d', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
   showText: {
-    color: '#4da3ff',
     fontSize: 12,
     fontWeight: '700',
     textDecorationLine: 'underline',

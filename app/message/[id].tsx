@@ -5,6 +5,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useStore } from '@/store';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@/lib/colors';
 
 interface ChatMessage {
   id: string;
@@ -17,7 +18,8 @@ interface ChatMessage {
 export default function MessageScreen() {
   const insets = useSafeAreaInsets();
   const { id: otherId } = useLocalSearchParams<{ id: string }>();
-  const { currentUser } = useStore();
+  const { currentUser, theme } = useStore();
+  const t = colors[theme];
   const [otherProfile, setOtherProfile] = React.useState<{ name?: string; avatar_url?: string } | null>(null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
@@ -114,29 +116,46 @@ export default function MessageScreen() {
   const renderItem = ({ item }: { item: ChatMessage }) => {
     const mine = item.sender_id === myId;
     const timeStr = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Original dark mode styles:
+    // bubbleMine: { backgroundColor: '#d1f1ff', borderColor: '#7cc5e6' }
+    // bubbleOther: { backgroundColor: '#1a1a1a', borderColor: '#333' }
+    // bubbleTextMine: { color: '#0a0a0a' }
+    // bubbleTextOther: { color: '#eeeeee' }
+
     return (
       <View style={[styles.bubbleRow, mine ? styles.right : styles.left]}>
-        <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther]}>
-          <Text style={mine ? styles.bubbleTextMine : styles.bubbleTextOther}>{item.body}</Text>
-          <Text style={mine ? styles.timeMine : styles.timeOther}>{timeStr}</Text>
+        <View style={[
+          styles.bubble,
+          mine ? styles.bubbleMine : styles.bubbleOther,
+          theme === 'light' ? (mine ? { backgroundColor: t.primary, borderColor: t.primary } : { backgroundColor: t.card, borderColor: t.border }) : undefined
+        ]}>
+          <Text style={[
+            mine ? styles.bubbleTextMine : styles.bubbleTextOther,
+            theme === 'light' ? { color: mine ? '#fff' : t.text } : undefined
+          ]}>{item.body}</Text>
+          <Text style={[
+            mine ? styles.timeMine : styles.timeOther,
+            theme === 'light' ? { color: mine ? '#e1f0ff' : t.textMuted } : undefined
+          ]}>{timeStr}</Text>
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: t.background }]}>
+      <View style={[styles.header, { borderBottomColor: t.borderSubtle }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="chevron-back" size={20} color="#fff" />
+          <Ionicons name="chevron-back" size={20} color={t.text} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.headerPeer} onPress={() => router.push(`/profile/${peerId}` as any)}>
           {otherProfile?.avatar_url ? (
             <Image source={{ uri: otherProfile.avatar_url }} style={styles.headerAvatar} />
           ) : (
-            <View style={styles.headerAvatar} />
+            <View style={[styles.headerAvatar, { backgroundColor: theme === 'dark' ? '#222' : t.card }]} />
           )}
-          <Text style={styles.headerTitle} numberOfLines={1}>{otherProfile?.name || 'Chat'}</Text>
+          <Text style={[styles.headerTitle, { color: t.text }]} numberOfLines={1}>{otherProfile?.name || 'Chat'}</Text>
         </TouchableOpacity>
         <View style={{ width: 40 }} />
       </View>
@@ -151,17 +170,25 @@ export default function MessageScreen() {
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
         />
-        <View style={[styles.inputBar, { paddingBottom: insets.bottom > 0 ? 8 : 12 }]}> 
+        <View style={[styles.inputBar, { paddingBottom: insets.bottom > 0 ? 8 : 12, borderTopColor: t.borderSubtle }]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: t.inputBg, color: t.text, borderColor: t.borderSubtle }]}
             placeholder="Message..."
-            placeholderTextColor="#888"
+            placeholderTextColor={t.textMuted}
             value={input}
             onChangeText={setInput}
             multiline
           />
-          <TouchableOpacity style={[styles.sendBtn, sending && styles.sendBtnDisabled]} onPress={sendMessage} disabled={sending}>
-            {sending ? <ActivityIndicator color="#0a0a0a" /> : <Ionicons name="send" size={16} color="#0a0a0a" />}
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              { backgroundColor: t.primary, borderColor: theme === 'dark' ? '#2a5b86' : t.borderSubtle },
+              sending && { opacity: 0.5 }
+            ]}
+            onPress={sendMessage}
+            disabled={sending}
+          >
+            {sending ? <ActivityIndicator color={theme === 'dark' ? '#0a0a0a' : t.background} /> : <Ionicons name="send" size={16} color={theme === 'dark' ? '#0a0a0a' : t.background} />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -170,12 +197,12 @@ export default function MessageScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#191919' },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8, borderBottomWidth: 1 },
   headerPeer: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#222' },
-  headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', flex: 1 },
+  headerAvatar: { width: 28, height: 28, borderRadius: 14 },
+  headerTitle: { fontSize: 16, fontWeight: '700', flex: 1 },
 
   list: { paddingHorizontal: 12, paddingTop: 8 },
   bubbleRow: { flexDirection: 'row', marginVertical: 4 },
@@ -186,11 +213,10 @@ const styles = StyleSheet.create({
   bubbleOther: { backgroundColor: '#1a1a1a', borderColor: '#333' },
   bubbleTextMine: { color: '#0a0a0a' },
   bubbleTextOther: { color: '#eeeeee' },
-  timeMine: { color: '#3f5360', fontSize: 10, marginTop: 4 },
+  timeMine: { color: '#3f5360', fontSize: 10, marginTop: 4, textAlign: 'right' },
   timeOther: { color: '#9aa0a6', fontSize: 10, marginTop: 4 },
 
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#191919' },
-  input: { flex: 1, minHeight: 40, maxHeight: 120, color: '#fff', backgroundColor: '#111', borderWidth: 1, borderColor: '#222', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  sendBtn: { backgroundColor: '#4da3ff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#2a5b86' },
-  sendBtnDisabled: { backgroundColor: '#2b5e91' },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1 },
+  input: { flex: 1, minHeight: 40, maxHeight: 120, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  sendBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1 },
 });
