@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, Image, Platform, KeyboardAvoidingView } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, Platform, KeyboardAvoidingView } from "react-native";
+import { Image } from 'expo-image';
 import { useStore } from "@/store";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -52,7 +53,7 @@ export default function PostScreen() {
       Alert.alert("Permission needed", "We need photo library permission to pick an image.");
       return;
     }
-    
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -76,7 +77,7 @@ export default function PostScreen() {
       Alert.alert("Incomplete", "Please fill in all required fields and add a photo.");
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const res = await createPost({
@@ -87,8 +88,14 @@ export default function PostScreen() {
         category,
         imageUri,
       });
-      
+
       if (res.ok) {
+        setTitle("");
+        setDescription("");
+        setPrice("");
+        setCondition(CONDITIONS[0]);
+        setCategory(CATEGORIES[0]);
+        setImageUri("");
         router.push(`/post/${res.id}` as any);
       } else {
         Alert.alert("Error", res.reason || "Failed to create listing. Please try again.");
@@ -102,22 +109,22 @@ export default function PostScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#0a0a0a' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={90}
     >
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.heading}>Sell an Item</Text>
-        
+
         {/* Image Upload */}
         <View style={styles.imageUploadContainer}>
           {imageUri ? (
             <TouchableOpacity onPress={pickImage} style={styles.imagePreview}>
-              <Image 
-                source={{ uri: imageUri }} 
-                style={styles.previewImage} 
-                resizeMode="cover"
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.previewImage}
+                contentFit="cover"
               />
               <View style={styles.changePhotoButton}>
                 <Ionicons name="camera" size={20} color="#fff" />
@@ -131,19 +138,19 @@ export default function PostScreen() {
             </TouchableOpacity>
           )}
         </View>
-        
+
         {/* Form Fields */}
         <View style={styles.formGroup}>
           <Text style={styles.label}>Item Name*</Text>
-          <TextInput 
-            placeholder="What are you selling?" 
-            placeholderTextColor="#888" 
-            style={styles.input} 
-            value={title} 
-            onChangeText={setTitle} 
+          <TextInput
+            placeholder="What are you selling?"
+            placeholderTextColor="#888"
+            style={styles.input}
+            value={title}
+            onChangeText={setTitle}
           />
         </View>
-        
+
         <View style={styles.formGroup}>
           <Text style={styles.label}>Price*</Text>
           <View style={styles.priceInputContainer}>
@@ -158,7 +165,7 @@ export default function PostScreen() {
             />
           </View>
         </View>
-        
+
         <View style={styles.formGroup}>
           <Text style={styles.label}>Condition*</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
@@ -172,7 +179,7 @@ export default function PostScreen() {
             })}
           </ScrollView>
         </View>
-        
+
         <View style={styles.formGroup}>
           <Text style={styles.label}>Category*</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
@@ -186,7 +193,7 @@ export default function PostScreen() {
             })}
           </ScrollView>
         </View>
-        
+
         <View style={styles.formGroup}>
           <Text style={styles.label}>Description (optional)</Text>
           <TextInput
@@ -199,9 +206,9 @@ export default function PostScreen() {
             onChangeText={setDescription}
           />
         </View>
-        
-        <TouchableOpacity 
-          style={[styles.submitButton, isLoading && styles.submitButtonDisabled]} 
+
+        <TouchableOpacity
+          style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
           onPress={onSubmit}
           disabled={isLoading}
         >
@@ -313,12 +320,12 @@ const styles = StyleSheet.create({
   submitButton: { backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20, borderWidth: 1, borderColor: '#e5e5e5' },
   submitButtonDisabled: { backgroundColor: '#e5e5e5' },
   submitButtonText: { color: '#0a0a0a', fontSize: 16, fontWeight: '800' },
-  row: { 
-    flexDirection: 'row' 
+  row: {
+    flexDirection: 'row'
   },
-  half: { 
-    flex: 1 
+  half: {
+    flex: 1
   },
 })
-;
+  ;
 

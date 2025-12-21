@@ -1,4 +1,4 @@
- export type Product = {
+export type Product = {
   id: string;
   userId: string;
   title: string;
@@ -17,9 +17,11 @@ export type User = {
   name: string;
   avatar?: string;
   phone?: string;
+  email?: string;
 };
 
 export type StoreState = {
   currentUser: User;
   posts: Product[]; // keeping name 'posts' in state to minimize refactor across UI
+  users: Record<string, User>;
 };

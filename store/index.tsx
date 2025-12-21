@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 import type { Product, StoreState, User } from './types';
 import { supabase } from '@/lib/supabase';
 
-// Storage bucket for post images (configurable via env)
 const POSTS_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_POSTS_BUCKET || 'post-images';
 const AVATARS_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_AVATARS_BUCKET || 'avatars';
 
@@ -24,8 +23,9 @@ type StoreContextType = StoreState & {
     status?: 'active' | 'sold' | 'inactive';
   }) => Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
   deletePost: (postId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
-  updateProfile: (input: { name?: string; phone?: string; avatarUri?: string | null }) => Promise<{ ok: true } | { ok: false; reason: string }>;
+  updateProfile: (input: { name?: string; phone?: string; avatarUri?: string | null; email?: string }) => Promise<{ ok: true } | { ok: false; reason: string }>;
   deleteAccount: () => Promise<{ ok: true } | { ok: false; reason: string }>;
+  getUser: (userId: string) => Promise<User | undefined>;
 };
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -39,9 +39,31 @@ export const useStore = () => {
 };
 
 export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
-  const [state, setState] = useState<StoreState>({ currentUser: { id: '', name: '' }, posts: [] });
+  const [state, setState] = useState<StoreState>({ currentUser: { id: '', name: '' }, posts: [], users: {} });
 
-  // Helpers
+  const getUser: StoreContextType['getUser'] = useCallback(async (userId: string) => {
+    if (state.users[userId]) return state.users[userId];
+    // Fetch
+    try {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (data) {
+        const u: User = {
+          id: data.id,
+          name: data.name,
+          avatar: data.avatar_url,
+          phone: data.phone,
+          email: data.email
+        };
+        setState(prev => ({ ...prev, users: { ...prev.users, [userId]: u } }));
+        return u;
+      }
+    } catch (e) {
+      console.warn('getUser failed', e);
+    }
+    return undefined;
+  }, [state.users]);
+
+  /* Update loadSession to include email */
   const loadSession = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
@@ -52,12 +74,59 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
         const initialName = (session.user.user_metadata as any)?.name || session.user.email || 'User';
         await supabase.from('profiles').upsert({ id: uid, name: initialName }, { onConflict: 'id' });
       }
-      const user: User = { id: uid, name: (profile?.name) || (session.user.user_metadata as any)?.name || session.user.email || 'User', avatar: profile?.avatar_url, phone: profile?.phone || undefined };
+      const user: User = {
+        id: uid,
+        name: (profile?.name) || (session.user.user_metadata as any)?.name || session.user.email || 'User',
+        avatar: profile?.avatar_url,
+        phone: profile?.phone || undefined,
+        // If email col exists in profiles, use it. Else fallback to auth email.
+        // We assume 'email' column might be added to profiles for public display.
+        email: profile?.email || session.user.email
+      };
       setState((prev) => ({ ...prev, currentUser: user }));
     } else {
       setState((prev) => ({ ...prev, currentUser: { id: '', name: '' } }));
     }
   }, []);
+
+  /* ... skipping loadPosts ... */
+
+  /* Update updateProfile to handle email */
+  const updateProfile: StoreContextType['updateProfile'] = async (input: { name?: string; phone?: string; avatarUri?: string | null; email?: string }) => {
+    try {
+      if (!state.currentUser.id) return { ok: false, reason: 'Not signed in' };
+      const uid = state.currentUser.id;
+      let avatar_url: string | null | undefined = undefined;
+      if (typeof input.avatarUri !== 'undefined') {
+        if (input.avatarUri === null) avatar_url = null; // clear
+        else avatar_url = await uploadAvatarIfNeeded(uid, input.avatarUri);
+      }
+      const payload: any = {};
+      if (typeof input.name === 'string') payload.name = input.name;
+      if (typeof input.phone === 'string') payload.phone = input.phone;
+      if (typeof input.email === 'string') payload.email = input.email; // Save email to profiles
+      if (typeof avatar_url !== 'undefined') payload.avatar_url = avatar_url;
+
+      if (Object.keys(payload).length === 0) return { ok: true };
+
+      const { error } = await supabase.from('profiles').upsert({ id: uid, ...payload }, { onConflict: 'id' });
+      if (error) return { ok: false, reason: error.message };
+
+      setState((prev) => ({
+        ...prev,
+        currentUser: {
+          ...prev.currentUser,
+          name: typeof payload.name === 'string' ? payload.name : prev.currentUser.name,
+          avatar: typeof payload.avatar_url !== 'undefined' ? payload.avatar_url || undefined : prev.currentUser.avatar,
+          phone: typeof payload.phone === 'string' ? payload.phone : prev.currentUser.phone,
+          email: typeof payload.email === 'string' ? payload.email : prev.currentUser.email,
+        }
+      }));
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, reason: e.message };
+    }
+  };
 
   const loadPosts = useCallback(async () => {
     const { data, error } = await supabase
@@ -88,12 +157,59 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     loadSession();
     loadPosts();
+
+    // Listen for auth state changes (OAuth, session refresh, etc)
+    const { data: authSub } = supabase.auth.onAuthStateChange((_event, _session) => {
+      loadSession();
+    });
+
     // Realtime subscription for products
-    const channel = supabase.channel('products-changes')
+    const productsSub = supabase.channel('products-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => loadPosts())
       .subscribe();
-    return () => { channel.unsubscribe(); };
+
+    // Realtime subscription for profiles
+    const profilesSub = supabase.channel('profiles-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload: any) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const newProfile = payload.new;
+          if (newProfile && newProfile.id) {
+            const u: User = {
+              id: newProfile.id,
+              name: newProfile.name,
+              avatar: newProfile.avatar_url,
+              phone: newProfile.phone,
+              email: newProfile.email
+            };
+            setState(prev => {
+              const next = { ...prev };
+              // Update cache if exists or just always update/add? 
+              // Better to only update if we have it to avoid memory bloat?
+              // But effectively we want "realtime", so if we see it providing value
+              // Just allow update.
+              if (next.users[newProfile.id]) {
+                next.users = { ...next.users, [newProfile.id]: u };
+              }
+              // Also update currentUser if it matches
+              if (next.currentUser.id === newProfile.id) {
+                next.currentUser = { ...next.currentUser, ...u };
+              }
+              return next;
+            });
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      authSub.subscription.unsubscribe();
+      productsSub.unsubscribe();
+      profilesSub.unsubscribe();
+    };
   }, [loadSession, loadPosts]);
+
+  /* ... skipping handlers ... */
+
 
   const signIn: StoreContextType['signIn'] = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -101,13 +217,13 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     // Ensure email is verified before allowing sign-in
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
     if (userErr) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       return { ok: false, reason: userErr.message };
     }
     const user = userRes.user;
     const emailVerified = !!(user as any)?.email_confirmed_at;
     if (!emailVerified) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       return { ok: false, reason: 'Please verify your email before signing in. Check your inbox for the confirmation link.' };
     }
     await loadSession();
@@ -131,7 +247,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
               await supabase.storage.from(POSTS_BUCKET).remove([path]);
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       const { error: delPostsErr } = await supabase.from('products').delete().eq('user_id', uid);
@@ -147,12 +263,11 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
             await supabase.storage.from(AVATARS_BUCKET).remove([path]);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
 
       const { error: delProfileErr } = await supabase.from('profiles').delete().eq('id', uid);
       if (delProfileErr) return { ok: false, reason: delProfileErr.message };
 
-      // Also delete the auth user via Edge Function (requires you to deploy it with service role)
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
@@ -174,7 +289,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
         console.warn('[deleteAccount] delete-auth-user function failed:', (e as any)?.message || e);
       }
 
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       setState((prev) => ({ ...prev, currentUser: { id: '', name: '' }, posts: prev.posts.filter(p => p.userId !== uid) }));
       return { ok: true };
     } catch (e: any) {
@@ -182,38 +297,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const updateProfile: StoreContextType['updateProfile'] = async (input) => {
-    try {
-      if (!state.currentUser.id) return { ok: false, reason: 'Not signed in' };
-      const uid = state.currentUser.id;
-      let avatar_url: string | null | undefined = undefined;
-      if (typeof input.avatarUri !== 'undefined') {
-        if (input.avatarUri === null) avatar_url = null; // clear
-        else avatar_url = await uploadAvatarIfNeeded(uid, input.avatarUri);
-      }
-      const payload: any = {};
-      if (typeof input.name === 'string') payload.name = input.name;
-      if (typeof input.phone === 'string') payload.phone = input.phone;
-      if (typeof avatar_url !== 'undefined') payload.avatar_url = avatar_url;
-      if (Object.keys(payload).length === 0) return { ok: true };
-      // Use upsert so that if the profile row doesn't exist yet, it will be created
-      const { error } = await supabase.from('profiles').upsert({ id: uid, ...payload }, { onConflict: 'id' });
-      if (error) return { ok: false, reason: error.message };
-      // Refresh current user in state
-      setState((prev) => ({
-        ...prev,
-        currentUser: {
-          ...prev.currentUser,
-          name: typeof payload.name === 'string' ? payload.name : prev.currentUser.name,
-          avatar: typeof payload.avatar_url !== 'undefined' ? payload.avatar_url || undefined : prev.currentUser.avatar,
-          phone: typeof payload.phone === 'string' ? payload.phone : prev.currentUser.phone,
-        }
-      }));
-      return { ok: true };
-    } catch (e: any) {
-      return { ok: false, reason: e.message };
-    }
-  };
+
 
   const deletePost: StoreContextType['deletePost'] = async (postId) => {
     try {
@@ -222,7 +306,6 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       if (!post) return { ok: false, reason: 'Post not found' };
       if (post.userId !== state.currentUser.id) return { ok: false, reason: 'You can only delete your own post' };
 
-      // Try to delete the associated image if it's in our bucket
       try {
         const url = post.imageUri || '';
         const marker = `/object/public/${POSTS_BUCKET}/`;
@@ -276,7 +359,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut: StoreContextType['signOut'] = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     await loadSession();
   };
 
@@ -289,14 +372,12 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   async function uploadIfNeeded(userId: string, uri: string): Promise<string> {
-    if (!uri || uri.startsWith('http')) return uri; // already remote
+    if (!uri || uri.startsWith('http')) return uri;
     if (Platform.OS === 'web' && uri.startsWith('file://')) {
       throw new Error('Cannot upload local file:// paths on web. Please use Pick Image (blob:) or paste an https image URL.');
     }
-    // Fetch the local or remote resource and read as ArrayBuffer to support React Native
     const res = await fetch(uri);
     const arrayBuffer = await res.arrayBuffer();
-    // Try to infer extension from URI path, fallback to jpg
     const uriLower = uri.toLowerCase();
     let ext = 'jpg';
     if (uriLower.includes('.png')) ext = 'png';
@@ -304,19 +385,17 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     else if (uriLower.includes('.webp')) ext = 'webp';
     else if (uriLower.includes('.heic')) ext = 'heic';
     else if (uriLower.includes('.heif')) ext = 'heif';
-    // Content type mapping
     const contentType =
       ext === 'png' ? 'image/png' :
-      ext === 'webp' ? 'image/webp' :
-      ext === 'heic' ? 'image/heic' :
-      ext === 'heif' ? 'image/heif' :
-      'image/jpeg';
+        ext === 'webp' ? 'image/webp' :
+          ext === 'heic' ? 'image/heic' :
+            ext === 'heif' ? 'image/heif' :
+              'image/jpeg';
     const filename = `${userId}/${simpleId()}.${ext}`;
     const { error } = await supabase.storage
       .from(POSTS_BUCKET)
       .upload(filename, arrayBuffer, { contentType, upsert: false });
     if (error) {
-      // Surface a clearer message if the bucket is missing
       const reason = (error as any)?.message || String(error);
       if (reason?.toLowerCase().includes('bucket') && reason?.toLowerCase().includes('not found')) {
         throw new Error(`Supabase storage bucket "${POSTS_BUCKET}" not found. Create it in your Supabase project (Storage > Create bucket) and make it public or adjust EXPO_PUBLIC_SUPABASE_POSTS_BUCKET.`);
@@ -327,11 +406,10 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     return data.publicUrl;
   }
 
-  // Upload avatar image if needed (null -> clear, undefined -> ignore)
   async function uploadAvatarIfNeeded(userId: string, uri?: string | null): Promise<string | null | undefined> {
-    if (typeof uri === 'undefined') return undefined; // ignore
-    if (uri === null) return null; // clear avatar
-    if (!uri || uri.startsWith('http')) return uri; // already remote
+    if (typeof uri === 'undefined') return undefined;
+    if (uri === null) return null;
+    if (!uri || uri.startsWith('http')) return uri;
     if (Platform.OS === 'web' && uri.startsWith('file://')) {
       throw new Error('Cannot upload local file:// paths on web. Please use Pick Image (blob:) or paste an https image URL.');
     }
@@ -346,10 +424,10 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     else if (uriLower.includes('.heif')) ext = 'heif';
     const contentType =
       ext === 'png' ? 'image/png' :
-      ext === 'webp' ? 'image/webp' :
-      ext === 'heic' ? 'image/heic' :
-      ext === 'heif' ? 'image/heif' :
-      'image/jpeg';
+        ext === 'webp' ? 'image/webp' :
+          ext === 'heic' ? 'image/heic' :
+            ext === 'heif' ? 'image/heif' :
+              'image/jpeg';
     const filename = `${userId}/${simpleId()}.${ext}`;
     const { error } = await supabase.storage
       .from(AVATARS_BUCKET)
@@ -392,7 +470,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const userPosts = useCallback((userId: string) => state.posts.filter((p) => p.userId === userId).sort((a,b) => b.createdAt - a.createdAt), [state.posts]);
+  const userPosts = useCallback((userId: string) => state.posts.filter((p) => p.userId === userId).sort((a, b) => b.createdAt - a.createdAt), [state.posts]);
   const getPost = useCallback((postId: string) => state.posts.find((p) => p.id === postId), [state.posts]);
 
   const value = useMemo<StoreContextType>(() => ({
@@ -407,7 +485,8 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     deletePost,
     updateProfile,
     deleteAccount,
-  }), [state]);
+    getUser,
+  }), [state, getUser, userPosts, getPost, loadSession, loadPosts]);
 
   return (
     <StoreContext.Provider value={value}>

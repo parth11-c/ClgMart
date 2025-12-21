@@ -17,8 +17,7 @@ export default function ExploreScreen() {
   const [query, setQuery] = React.useState("");
   const [shuffled, setShuffled] = React.useState<Post[]>([]);
 
-  // Shuffle posts once per session to keep the feed feeling random
-  React.useEffect(() => {
+   React.useEffect(() => {
     const randomized = posts
       .filter(Boolean)
       .map(({ id, title, imageUri }) => ({ id, title, imageUri }))

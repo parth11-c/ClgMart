@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert, Linking, Platform } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Linking, Platform, Image as RNImage } from "react-native";
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 // Removed SafeAreaView and insets
 import { useStore } from "@/store";
@@ -7,72 +8,10 @@ import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
 
 export default function ProfileScreen() {
-  const { currentUser, userPosts, deletePost, deleteAccount } = useStore();
+  const { currentUser, userPosts, deletePost } = useStore();
   const posts = userPosts(currentUser.id);
 
-  const formatPhone = (raw?: string) => {
-    if (!raw) return '';
-    const m = raw.match(/^(\+\d{1,3})(\d{5,14})$/);
-    if (!m) return raw; // fallback to raw if it doesn't match our simple pattern
-    const cc = m[1];
-    const digits = m[2];
-    // India: +91 XXXXX XXXXX (10 national digits: 5-5)
-    if (cc === '+91' && digits.length === 10) {
-      return `${cc} ${digits.slice(0,5)} ${digits.slice(5)}`;
-    }
-    // US/Canada: +1 555 123 4567 (10 national digits: 3-3-4)
-    if (cc === '+1' && digits.length === 10) {
-      return `${cc} ${digits.slice(0,3)} ${digits.slice(3,6)} ${digits.slice(6)}`;
-    }
-    // Default: group from the end in 3-3-4-ish chunks for readability
-    const parts: string[] = [];
-    let rest = digits;
-    while (rest.length > 4) {
-      parts.push(rest.slice(0,3));
-      rest = rest.slice(3);
-    }
-    parts.push(rest);
-    return `${cc} ${parts.join(' ')}`.trim();
-  };
-
-  const confirmDeleteAccount = () => {
-    const doDelete = async () => {
-      const res = await deleteAccount();
-      if (!res.ok) {
-        Alert.alert('Error', res.reason || 'Failed to delete account.');
-        return;
-      }
-      router.replace('/' as any);
-    };
-
-    if (Platform.OS === 'web') {
-      // react-native-web Alert does not support multi-button callbacks
-      const ok = typeof window !== 'undefined' ? window.confirm('This will permanently delete your profile, posts, and associated images. This action cannot be undone.') : false;
-      if (ok) {
-        doDelete();
-      }
-      return;
-    }
-
-    Alert.alert(
-      'Delete account',
-      'This will permanently delete your profile, posts, and associated images. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: doDelete },
-      ]
-    );
-  };
-
-  const onLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      // ignore
-    } finally {
-      router.replace('/auth/sign-in' as any);
-    }
-  };
+  /* ... skipping formatPhone ... */
 
   const confirmDelete = (postId: string) => {
     Alert.alert(
@@ -80,12 +19,14 @@ export default function ProfileScreen() {
       'Are you sure you want to delete this post? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => {
-          const res = await deletePost(postId);
-          if (!res.ok) {
-            Alert.alert('Error', res.reason || 'Failed to delete post.');
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            const res = await deletePost(postId);
+            if (!res.ok) {
+              Alert.alert('Error', res.reason || 'Failed to delete post.');
+            }
           }
-        }},
+        },
       ]
     );
   };
@@ -97,7 +38,7 @@ export default function ProfileScreen() {
       Alert.alert('Phone required', 'Add your WhatsApp number in profile to chat.');
       return;
     }
-    const url = `https://wa.me/${digits}`; // WhatsApp expects digits only, no +
+    const url = `https://wa.me/${digits}`;
     try {
       await Linking.openURL(url);
     } catch (e: any) {
@@ -109,13 +50,17 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         {currentUser?.avatar ? (
-          <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
+          <Image source={{ uri: currentUser.avatar }} style={styles.avatar} contentFit="cover" />
         ) : (
           <View style={styles.avatar} />
         )}
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{currentUser.name}</Text>
+          {currentUser.email && <Text style={{ color: '#aaa', fontSize: 13, marginTop: 2 }}>{currentUser.email}</Text>}
         </View>
+        <TouchableOpacity onPress={() => router.push('/settings' as any)} style={{ padding: 8 }}>
+          <Ionicons name="settings-outline" size={24} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       {/* Actions */}
@@ -127,14 +72,6 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.wpBtn} onPress={openWhatsApp}>
           <Ionicons name="logo-whatsapp" size={16} color="#1f3124" />
           <Text style={styles.wpBtnText}>WhatsApp</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-          <Ionicons name="log-out-outline" size={16} color="#fff" />
-          <Text style={styles.logoutBtnText}>Logout</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteAccBtn} onPress={confirmDeleteAccount}>
-          <Ionicons name="trash-outline" size={16} color="#fff" />
-          <Text style={styles.deleteAccBtnText}>Delete account</Text>
         </TouchableOpacity>
       </View>
 
@@ -160,12 +97,12 @@ export default function ProfileScreen() {
           contentContainerStyle={[styles.gridContent, { paddingBottom: 80 }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.gridItem} 
+            <TouchableOpacity
+              style={styles.gridItem}
               onPress={() => router.push(`/post/${item.id}` as any)}
               onLongPress={() => confirmDelete(item.id)}
             >
-              <Image source={{ uri: item.imageUri }} style={styles.gridImage} resizeMode="cover" />
+              <Image source={{ uri: item.imageUri }} style={styles.gridImage} contentFit="cover" transition={200} />
               <TouchableOpacity
                 style={styles.deleteBtn}
                 onPress={() => confirmDelete(item.id)}
@@ -185,7 +122,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0a0a0a", paddingHorizontal: 12, paddingTop: 1 },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 6 ,marginTop: 16},
+  header: { flexDirection: "row", alignItems: "center", marginBottom: 6, marginTop: 16 },
   avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#444", marginRight: 12 },
   name: { color: "#fff", fontSize: 20, fontWeight: "800", marginBottom: 2 },
   sub: { color: "#aaa" },
@@ -211,12 +148,12 @@ const styles = StyleSheet.create({
   promptText: { color: '#ddd', flex: 1, fontSize: 13 },
   gridContent: { paddingTop: 8 },
   gridRow: { justifyContent: 'space-between', marginBottom: 8 },
-  gridItem: { 
-    backgroundColor: '#111', 
-    borderColor: '#222', 
-    borderWidth: 1, 
-    borderRadius: 10, 
-    overflow: 'hidden', 
+  gridItem: {
+    backgroundColor: '#111',
+    borderColor: '#222',
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
     width: '49%',
     aspectRatio: 1,
   },

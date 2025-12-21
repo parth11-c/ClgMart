@@ -1,39 +1,27 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert, Linking } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Linking, Image as RNImage } from "react-native";
+import { Image } from 'expo-image';
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "@/store";
 import { router } from "expo-router";
-import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
-import * as WebBrowser from 'expo-web-browser';
+import { User } from "@/store/types";
 
 export default function UserProfileViewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { userPosts } = useStore();
+  const { userPosts, getUser, currentUser } = useStore();
   const insets = useSafeAreaInsets();
-  const [profile, setProfile] = React.useState<{ name?: string; avatar_url?: string; phone?: string } | null>(null);
+  const [profile, setProfile] = React.useState<User | undefined>(undefined);
+  const isOwnProfile = id === currentUser.id;
 
-  const formatPhone = (raw?: string) => {
-    if (!raw) return '';
-    const m = raw.match(/^(\+\d{1,2})(\d{3,11})$/);
-    if (!m) return raw;
-    const cc = m[1];
-    const digits = m[2];
-    if (cc === '+91' && digits.length === 10) {
-      return `${cc} ${digits.slice(0,5)} ${digits.slice(5)}`;
-    }
-    if (cc === '+1' && digits.length === 10) {
-      return `${cc} ${digits.slice(0,3)} ${digits.slice(3,6)} ${digits.slice(6)}`;
-    }
-    const parts: string[] = [];
-    let rest = digits;
-    while (rest.length > 4) {
-      parts.push(rest.slice(0,3));
-      rest = rest.slice(3);
-    }
-    parts.push(rest);
-    return `${cc} ${parts.join(' ')}`.trim();
+  /* Mask details helper */
+  const maskEmail = (email?: string) => {
+    if (!email) return '';
+    const [name, domain] = email.split('@');
+    if (!name || !domain) return email;
+    const maskedName = name.length > 3 ? name.slice(0, 3) + '****' : name + '****';
+    return `${maskedName}@${domain}`;
   };
 
   if (!id) {
@@ -48,22 +36,11 @@ export default function UserProfileViewScreen() {
 
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
-      if (!id) return;
-      const { data } = await supabase.from('profiles').select('name, avatar_url, phone').eq('id', id).single();
-      if (mounted) setProfile(data as any);
-    })();
+    getUser(id).then((u) => {
+      if (mounted) setProfile(u);
+    });
     return () => { mounted = false; };
-  }, [id]);
-
-  const handleCall = () => {
-    const phoneNumber = profile?.phone?.replace(/\s+/g, '');
-    if (!phoneNumber) {
-      Alert.alert('No phone number', 'This user has not added a phone number yet.');
-      return;
-    }
-    Linking.openURL(`tel:${phoneNumber}`);
-  };
+  }, [id, getUser]);
 
   const handleWhatsApp = () => {
     const message = `Hi, I found your profile on ClgMart.`;
@@ -78,34 +55,40 @@ export default function UserProfileViewScreen() {
       return;
     }
     const url = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-    WebBrowser.openBrowserAsync(url);
+    Linking.openURL(url).catch((err) => Alert.alert('Error', 'Could not open WhatsApp'));
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerCard}>
         <View style={styles.header}>
-          {profile?.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+          {profile?.avatar ? (
+            <Image source={{ uri: profile.avatar }} style={styles.avatarImage} contentFit="cover" />
           ) : (
             <View style={styles.avatar} />
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{profile?.name || 'User'}</Text>
-            <Text style={styles.sub}>{formatPhone(profile?.phone) || 'WhatsApp not added'}</Text>
+            {/* Show masked email instead of phone for privacy */}
+            <Text style={styles.sub}>
+              {profile?.email ? maskEmail(profile.email) : (profile?.phone ? 'Contact via WhatsApp' : 'No contact info')}
+            </Text>
           </View>
         </View>
+
         {/* Actions (match profile page but Edit -> Message) */}
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.editBtn} onPress={() => router.push(`/message/${id}` as any)}>
-            <Ionicons name="chatbubble-ellipses" size={16} color="#4da3ff" />
-            <Text style={styles.editBtnText}>Message</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.wpBtn} onPress={handleWhatsApp}>
-            <Ionicons name="logo-whatsapp" size={16} color="#1f3124" />
-            <Text style={styles.wpBtnText}>WhatsApp</Text>
-          </TouchableOpacity>
-        </View>
+        {!isOwnProfile && (
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.editBtn} onPress={() => router.push(`/message/${id}` as any)}>
+              <Ionicons name="chatbubble-ellipses" size={16} color="#4da3ff" />
+              <Text style={styles.editBtnText}>Message</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.wpBtn} onPress={handleWhatsApp}>
+              <Ionicons name="logo-whatsapp" size={16} color="#1f3124" />
+              <Text style={styles.wpBtnText}>WhatsApp</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       <View style={styles.divider} />
 
@@ -126,7 +109,7 @@ export default function UserProfileViewScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.gridItem} onPress={() => router.push(`/post/${item.id}` as any)}>
-              <Image source={{ uri: item.imageUri }} style={styles.gridImage} resizeMode="cover" />
+              <Image source={{ uri: item.imageUri }} style={styles.gridImage} contentFit="cover" transition={200} />
               <View style={styles.gridFooter}>
                 <Text style={styles.gridTitle} numberOfLines={1}>{(item as any).title || 'Product'}</Text>
                 {!!(item as any).price && (
@@ -144,12 +127,12 @@ export default function UserProfileViewScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0a0a0a", padding: 16 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0a0a0a" },
-  headerCard: { 
-    backgroundColor: '#0f0f0f', 
-    borderColor: '#1e1e1e', 
-    borderWidth: 1, 
-    borderRadius: 14, 
-    padding: 12, 
+  headerCard: {
+    backgroundColor: '#0f0f0f',
+    borderColor: '#1e1e1e',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
     marginBottom: 12,
     // subtle shadow
     shadowColor: '#000',

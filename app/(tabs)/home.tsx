@@ -1,27 +1,25 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert, Linking } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Linking, Image as RNImage } from "react-native";
+import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "@/store";
 import { router } from "expo-router";
-import { supabase } from "@/lib/supabase";
 import { Ionicons } from '@expo/vector-icons';
+import { User } from "@/store/types";
 
 type Post = ReturnType<typeof useStore>["posts"][number];
 
 function PostCard({ item }: { item: Post }) {
-  const [seller, setSeller] = React.useState<{ name?: string; avatar_url?: string; phone?: string } | null>(null);
+  const { getUser } = useStore();
+  const [seller, setSeller] = React.useState<User | undefined>(undefined);
+
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('name, avatar_url, phone')
-        .eq('id', item.userId)
-        .single();
-      if (mounted) setSeller(data as any);
-    })();
+    getUser(item.userId).then((u) => {
+      if (mounted) setSeller(u);
+    });
     return () => { mounted = false; };
-  }, [item.userId]);
+  }, [item.userId, getUser]);
 
   const handleWhatsApp = () => {
     const message = `Hi, I'm interested in your product: ${item.title}`;
@@ -42,7 +40,7 @@ function PostCard({ item }: { item: Post }) {
   return (
     <TouchableOpacity style={styles.card} onPress={() => router.push(`/post/${item.id}` as any)}>
       <View style={styles.imageWrap}>
-        <Image source={{ uri: item.imageUri }} style={styles.image} />
+        <Image source={{ uri: item.imageUri }} style={styles.image} contentFit="cover" transition={200} />
         <View style={styles.imageOverlay} />
         <View style={styles.priceBadge}><Text style={styles.priceBadgeText}>₹{item.price?.toFixed?.(0) ?? item.price}</Text></View>
       </View>
@@ -50,8 +48,8 @@ function PostCard({ item }: { item: Post }) {
         <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.meta} numberOfLines={1}>{item.category} • {String(item.condition).toLowerCase()} condition</Text>
         <View style={styles.sellerRow}>
-          {seller?.avatar_url ? (
-            <Image source={{ uri: seller.avatar_url }} style={styles.sellerAvatar} />
+          {seller?.avatar ? (
+            <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} contentFit="cover" />
           ) : (
             <View style={styles.sellerAvatarPlaceholder} />
           )}
@@ -83,6 +81,10 @@ export default function HomeScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
           renderItem={({ item }) => (<PostCard item={item as any} />)}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          removeClippedSubviews={true}
         />
       )}
     </SafeAreaView>
@@ -94,12 +96,12 @@ const styles = StyleSheet.create({
   text: { color: "#fff", textAlign: "center" },
   emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   list: { padding: 12 },
-  card: { 
-    backgroundColor: "#111", 
-    borderRadius: 12, 
-    overflow: "hidden", 
-    marginBottom: 12, 
-    borderColor: "#222", 
+  card: {
+    backgroundColor: "#111",
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 12,
+    borderColor: "#222",
     borderWidth: 1,
     // subtle shadow
     shadowColor: '#000',

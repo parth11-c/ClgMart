@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import * as Linking from 'expo-linking';
 import { fontSizes, responsiveValue, buttonDimensions, shadows } from "../../lib/responsive";
 import { useStore } from "@/store";
 import { supabase } from "@/lib/supabase";
@@ -19,23 +20,42 @@ export default function SignInScreen() {
   useEffect(() => {
     let mounted = true;
     (async () => {
+      // Check initial session
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
       if (session?.user) router.replace("/(tabs)/home" as any);
     })();
+
+    // Listen for auth state changes (e.g. after OAuth / magic link)
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) router.replace("/(tabs)/home" as any);
     });
+
+    // Also listen for deep links returning to the app
+    const linkSub = Linking.addEventListener('url', async ({ url }) => {
+      try {
+        // If we get a deep link, try to parse session from it or just check session
+        // Expo Go sometimes handles the callback internally, so we just check session status
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) router.replace("/(tabs)/home" as any);
+      } catch (e) {
+        console.warn('Deep link check error', e);
+      }
+    });
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
+      linkSub.remove();
     };
   }, []);
 
   const handleGoogleAuth = async () => {
     try {
       await startGoogleOAuth();
+      // On success, the deep link listener above or onAuthStateChange will handle navigation
     } catch (e: any) {
+      if (e?.message?.includes('User canceled')) return; // ignore cancel
       Alert.alert('OAuth error', e?.message || 'Could not start Google sign-in');
     }
   };

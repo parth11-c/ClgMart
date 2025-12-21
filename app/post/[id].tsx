@@ -1,34 +1,31 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Share, Linking, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Linking, Alert, Image as RNImage } from "react-native";
+import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { useStore } from "@/store";
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
-import { supabase } from "@/lib/supabase";
+import { User } from "@/store/types";
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPost } = useStore();
+  const { getPost, getUser, currentUser } = useStore();
   const post = id ? getPost(id) : undefined;
+  const isOwnPost = post?.userId === currentUser.id;
   const insets = useSafeAreaInsets();
-  
+
   const [activeImageIndex, setActiveImageIndex] = React.useState(0);
-  const [seller, setSeller] = React.useState<{ name: string; avatar_url?: string; phone?: string } | null>(null);
+  const [seller, setSeller] = React.useState<User | undefined>(undefined);
 
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
-      if (!post?.userId) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('name, avatar_url, phone')
-        .eq('id', post.userId)
-        .single();
-      if (mounted) setSeller(data as any);
-    })();
+    if (post?.userId) {
+      getUser(post.userId).then(u => {
+        if (mounted) setSeller(u);
+      });
+    }
     return () => { mounted = false; };
-  }, [post?.userId]);
+  }, [post?.userId, getUser]);
 
   const formatPhone = (raw?: string) => {
     if (!raw) return '';
@@ -37,15 +34,15 @@ export default function PostDetailScreen() {
     const cc = m[1];
     const digits = m[2];
     if (cc === '+91' && digits.length === 10) {
-      return `${cc} ${digits.slice(0,5)} ${digits.slice(5)}`;
+      return `${cc} ${digits.slice(0, 5)} ${digits.slice(5)}`;
     }
     if (cc === '+1' && digits.length === 10) {
-      return `${cc} ${digits.slice(0,3)} ${digits.slice(3,6)} ${digits.slice(6)}`;
+      return `${cc} ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
     }
     const parts: string[] = [];
     let rest = digits;
     while (rest.length > 4) {
-      parts.push(rest.slice(0,3));
+      parts.push(rest.slice(0, 3));
       rest = rest.slice(3);
     }
     parts.push(rest);
@@ -73,11 +70,7 @@ export default function PostDetailScreen() {
       return;
     }
     const url = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-    try {
-      await WebBrowser.openBrowserAsync(url);
-    } catch (e: any) {
-      Alert.alert('Cannot open WhatsApp', e?.message || 'Please try again.');
-    }
+    Linking.openURL(url).catch((e) => Alert.alert('Cannot open WhatsApp', e?.message || 'Please try again.'));
   };
 
   const handleContactSeller = () => {
@@ -96,37 +89,38 @@ export default function PostDetailScreen() {
       Alert.alert('WhatsApp unavailable', 'The seller has not added a WhatsApp number yet.');
       return;
     }
-    // wa.me requires international number without '+' and without any special chars
     const digits = raw.replace(/\D+/g, '');
     if (!digits) {
       Alert.alert('Invalid number', 'The seller phone number appears invalid.');
       return;
     }
     const url = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-    WebBrowser.openBrowserAsync(url);
+    Linking.openURL(url).catch((e) => Alert.alert('Cannot open WhatsApp', e?.message || 'Please try again.'));
   };
-
-  // No direct buy on this screen for now
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         {/* Image Gallery */}
         <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: post.imageUri }} 
-            style={styles.image} 
-            resizeMode="cover"
+          <Image
+            source={{ uri: post?.imageUri }}
+            style={styles.image}
+            contentFit="cover"
+            transition={300}
           />
           <View style={styles.imageOverlay} />
+
           {/* Top icon bar over image */}
           <View style={styles.topImageBar}>
             <TouchableOpacity onPress={() => router.back()} style={styles.circleIconBtn}>
               <Ionicons name="chevron-back" size={18} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleShare} style={styles.circleIconBtn}>
-              <Ionicons name="logo-whatsapp" size={16} color="#fff" />
-            </TouchableOpacity>
+            {!isOwnPost && (
+              <TouchableOpacity onPress={handleShare} style={styles.circleIconBtn}>
+                <Ionicons name="logo-whatsapp" size={16} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
           {/* Floating price badge */}
           <View style={styles.priceBadge}>
@@ -155,7 +149,7 @@ export default function PostDetailScreen() {
         </View>
 
         {/* Price and chips */}
-        <View style={styles.priceContainer}> 
+        <View style={styles.priceContainer}>
           <Text style={styles.price}>₹{post.price?.toFixed(2) || '0.00'}</Text>
           <View style={styles.chipsRow}>
             {post.condition ? (
@@ -191,10 +185,10 @@ export default function PostDetailScreen() {
             style={styles.sellerCard}
             onPress={() => router.push(`/profile/${post.userId}` as any)}
           >
-            {seller?.avatar_url ? (
-              <Image source={{ uri: seller.avatar_url }} style={styles.sellerAvatarImage} />
+            {seller?.avatar ? (
+              <Image source={{ uri: seller.avatar }} style={styles.sellerAvatarImage} contentFit="cover" />
             ) : (
-              <View style={styles.sellerAvatar}> 
+              <View style={styles.sellerAvatar}>
                 <Ionicons name="person" size={24} color="#aaa" />
               </View>
             )}
@@ -213,8 +207,8 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     backgroundColor: '#0a0a0a',
   },
   content: {
@@ -518,5 +512,5 @@ const styles = StyleSheet.create({
     color: '#aaa',
     fontSize: 14,
   },
-  
+
 });

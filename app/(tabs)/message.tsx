@@ -58,8 +58,7 @@ export default function MessagesTab() {
       const conversations: Conversation[] = peers.map(pid => ({ peerId: pid, lastMessage: map.get(pid)!, peer: profiles[pid] || null }));
       setItems(conversations);
     } catch (e) {
-      // TODO: optionally report
-    } finally {
+     } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -90,8 +89,7 @@ export default function MessagesTab() {
           return next;
         });
 
-        // Fetch peer profile if we don't have it yet
-        const hasPeer = items.some(c => c.peerId === other && c.peer);
+         const hasPeer = items.some(c => c.peerId === other && c.peer);
         if (!hasPeer && !fetchingPeersRef.current.has(other)) {
           fetchingPeersRef.current.add(other);
           try {
