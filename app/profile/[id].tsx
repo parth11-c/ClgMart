@@ -24,6 +24,33 @@ export default function UserProfileViewScreen() {
     return `${maskedName}@${domain}`;
   };
 
+  const formatPhone = (raw?: string) => {
+    if (!raw) return '';
+    const m = raw.match(/^(\+\d{1,2})(\d{3,14})$/);
+    if (!m) return raw;
+    const cc = m[1];
+    const digits = m[2];
+    if (cc === '+91' && digits.length === 10) {
+      return `${cc} ${digits.slice(0, 5)} ${digits.slice(5)}`;
+    }
+    return raw;
+  };
+
+  const maskPhone = (phone?: string) => {
+    if (!phone) return '';
+    if (isOwnProfile) return formatPhone(phone);
+    const formatted = formatPhone(phone);
+    const parts = formatted.split(' ');
+    if (parts.length < 2) return '****' + formatted.slice(-4);
+    const newParts = [...parts];
+    if (newParts.length >= 3) {
+      newParts[newParts.length - 2] = '****';
+    } else {
+      newParts[newParts.length - 1] = '****';
+    }
+    return newParts.join(' ');
+  };
+
   if (!id) {
     return (
       <View style={styles.center}>
@@ -69,10 +96,11 @@ export default function UserProfileViewScreen() {
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{profile?.name || 'User'}</Text>
-            {/* Show masked email instead of phone for privacy */}
-            <Text style={styles.sub}>
-              {profile?.email ? maskEmail(profile.email) : (profile?.phone ? 'Contact via WhatsApp' : 'No contact info')}
-            </Text>
+            <View style={{ gap: 2 }}>
+              {profile?.email && <Text style={styles.sub}>{maskEmail(profile.email)}</Text>}
+              {profile?.phone && <Text style={styles.sub}>{maskPhone(profile.phone)}</Text>}
+              {!profile?.email && !profile?.phone && <Text style={styles.sub}>No contact info</Text>}
+            </View>
           </View>
         </View>
 
@@ -187,4 +215,10 @@ const styles = StyleSheet.create({
   wpBtnText: { color: '#1f3124', fontWeight: '800' },
   soldBadgeSmall: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.85)', borderColor: '#ff4d4d', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   soldTextSmall: { color: '#ff4d4d', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
+  showText: {
+    color: '#4da3ff',
+    fontSize: 12,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
 });

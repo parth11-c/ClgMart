@@ -49,6 +49,21 @@ export default function PostDetailScreen() {
     return `${cc} ${parts.join(' ')}`.trim();
   };
 
+  const maskPhone = (phone?: string) => {
+    if (!phone) return '';
+    if (isOwnPost) return formatPhone(phone);
+    const formatted = formatPhone(phone);
+    const parts = formatted.split(' ');
+    if (parts.length < 2) return '****' + formatted.slice(-4);
+    const newParts = [...parts];
+    if (newParts.length >= 3) {
+      newParts[newParts.length - 2] = '****';
+    } else {
+      newParts[newParts.length - 1] = '****';
+    }
+    return newParts.join(' ');
+  };
+
   if (!post) {
     return (
       <View style={styles.center}>
@@ -225,7 +240,7 @@ export default function PostDetailScreen() {
             )}
             <View style={styles.sellerDetails}>
               <Text style={styles.sellerName}>{seller?.name || 'Seller'}</Text>
-              <Text style={styles.sellerSub}>{formatPhone(seller?.phone) || 'WhatsApp not added'}</Text>
+              <Text style={styles.sellerSub}>{maskPhone(seller?.phone) || 'WhatsApp not added'}</Text>
             </View>
             <View style={styles.viewProfileBtn}>
               <Ionicons name="chevron-forward" size={18} color="#bbb" />
@@ -606,5 +621,11 @@ const styles = StyleSheet.create({
   },
   soldToggleTextActive: {
     color: '#fff',
+  },
+  showText: {
+    color: '#4da3ff',
+    fontSize: 12,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

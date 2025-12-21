@@ -57,7 +57,7 @@ export default function PostScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
+      aspect: [9, 16],
       quality: 0.7,
     });
 
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   imagePreview: {
     width: '100%',
-    height: 220,
+    height: 400,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#111',
