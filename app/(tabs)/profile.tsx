@@ -103,6 +103,11 @@ export default function ProfileScreen() {
               onLongPress={() => confirmDelete(item.id)}
             >
               <Image source={{ uri: item.imageUri }} style={styles.gridImage} contentFit="cover" transition={200} />
+              {item.status === 'sold' && (
+                <View style={[styles.soldBadgeSmall, { top: 6, left: 6, right: undefined }]}>
+                  <Text style={styles.soldTextSmall}>SOLD</Text>
+                </View>
+              )}
               <TouchableOpacity
                 style={styles.deleteBtn}
                 onPress={() => confirmDelete(item.id)}
@@ -173,4 +178,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)'
   },
+  soldBadgeSmall: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.85)', borderColor: '#ff4d4d', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  soldTextSmall: { color: '#ff4d4d', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
 });

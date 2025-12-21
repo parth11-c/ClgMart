@@ -26,6 +26,7 @@ type StoreContextType = StoreState & {
   updateProfile: (input: { name?: string; phone?: string; avatarUri?: string | null; email?: string }) => Promise<{ ok: true } | { ok: false; reason: string }>;
   deleteAccount: () => Promise<{ ok: true } | { ok: false; reason: string }>;
   getUser: (userId: string) => Promise<User | undefined>;
+  updatePostStatus: (postId: string, status: 'active' | 'sold') => Promise<{ ok: true } | { ok: false; reason: string }>;
 };
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -470,6 +471,17 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const updatePostStatus: StoreContextType['updatePostStatus'] = async (postId, status) => {
+    try {
+      const { error } = await supabase.from('products').update({ status }).eq('id', postId);
+      if (error) return { ok: false, reason: error.message };
+      await loadPosts();
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, reason: e.message };
+    }
+  };
+
   const userPosts = useCallback((userId: string) => state.posts.filter((p) => p.userId === userId).sort((a, b) => b.createdAt - a.createdAt), [state.posts]);
   const getPost = useCallback((postId: string) => state.posts.find((p) => p.id === postId), [state.posts]);
 
@@ -486,6 +498,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     updateProfile,
     deleteAccount,
     getUser,
+    updatePostStatus,
   }), [state, getUser, userPosts, getPost, loadSession, loadPosts]);
 
   return (

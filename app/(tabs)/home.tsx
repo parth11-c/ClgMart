@@ -43,6 +43,11 @@ function PostCard({ item }: { item: Post }) {
         <Image source={{ uri: item.imageUri }} style={styles.image} contentFit="cover" transition={200} />
         <View style={styles.imageOverlay} />
         <View style={styles.priceBadge}><Text style={styles.priceBadgeText}>₹{item.price?.toFixed?.(0) ?? item.price}</Text></View>
+        {item.status === 'sold' && (
+          <View style={styles.soldBadgeAcrossImage}>
+            <Text style={styles.soldTextAcrossImage}>SOLD</Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
@@ -56,9 +61,11 @@ function PostCard({ item }: { item: Post }) {
           <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push(`/profile/${item.userId}` as any)}>
             <Text style={styles.sellerName} numberOfLines={1}>{seller?.name || 'Seller'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.wpIconBtn} onPress={handleWhatsApp} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="logo-whatsapp" size={14} color="#ffffff" />
-          </TouchableOpacity>
+          {item.status !== 'sold' && (
+            <TouchableOpacity style={styles.wpIconBtn} onPress={handleWhatsApp} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="logo-whatsapp" size={14} color="#ffffff" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -123,4 +130,6 @@ const styles = StyleSheet.create({
   sellerAvatarPlaceholder: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
   sellerName: { color: '#ddd', fontSize: 12, fontWeight: '600' },
   wpIconBtn: { backgroundColor: '#111', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 6, borderWidth: 1, borderColor: '#222' },
+  soldBadgeAcrossImage: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.85)', borderColor: '#ff4d4d', borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  soldTextAcrossImage: { color: '#ff4d4d', fontWeight: '900', fontSize: 14, letterSpacing: 1.5 },
 });

@@ -9,6 +9,7 @@ type Post = {
   id: string;
   title: string;
   imageUri: string;
+  status: string;
 };
 
 export default function ExploreScreen() {
@@ -17,12 +18,12 @@ export default function ExploreScreen() {
   const [query, setQuery] = React.useState("");
   const [shuffled, setShuffled] = React.useState<Post[]>([]);
 
-   React.useEffect(() => {
+  React.useEffect(() => {
     const randomized = posts
       .filter(Boolean)
-      .map(({ id, title, imageUri }) => ({ id, title, imageUri }))
+      .map(({ id, title, imageUri, status }) => ({ id, title, imageUri, status }))
       .sort(() => Math.random() - 0.5);
-    setShuffled(randomized);
+    setShuffled(randomized as Post[]);
   }, [posts]);
 
   const data = React.useMemo(() => {
@@ -34,6 +35,11 @@ export default function ExploreScreen() {
   const renderItem = React.useCallback(({ item }: { item: Post }) => (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => router.push(`/post/${item.id}` as any)}>
       <Image source={{ uri: item.imageUri }} style={styles.image} resizeMode="cover" />
+      {item.status === 'sold' && (
+        <View style={styles.soldBadgeSmall}>
+          <Text style={styles.soldTextSmall}>SOLD</Text>
+        </View>
+      )}
     </TouchableOpacity>
   ), []);
 
@@ -126,4 +132,6 @@ const styles = StyleSheet.create({
   emptyWrap: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
   emptyTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
   emptySubtitle: { color: "#777", fontSize: 14, marginTop: 6 },
+  soldBadgeSmall: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.85)', borderColor: '#ff4d4d', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  soldTextSmall: { color: '#ff4d4d', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
 });

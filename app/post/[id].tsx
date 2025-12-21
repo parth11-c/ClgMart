@@ -9,7 +9,7 @@ import { User } from "@/store/types";
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPost, getUser, currentUser } = useStore();
+  const { getPost, getUser, currentUser, updatePostStatus } = useStore();
   const post = id ? getPost(id) : undefined;
   const isOwnPost = post?.userId === currentUser.id;
   const insets = useSafeAreaInsets();
@@ -98,6 +98,29 @@ export default function PostDetailScreen() {
     Linking.openURL(url).catch((e) => Alert.alert('Cannot open WhatsApp', e?.message || 'Please try again.'));
   };
 
+  const toggleSold = async () => {
+    if (!post) return;
+    const newStatus = post.status === 'sold' ? 'active' : 'sold';
+    const confirmMsg = newStatus === 'sold'
+      ? 'Mark this item as sold? It will still be visible but buyers will know it is no longer available.'
+      : 'Mark this item as available again?';
+
+    Alert.alert(
+      newStatus === 'sold' ? 'Mark as Sold' : 'Mark as Available',
+      confirmMsg,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            const res = await updatePostStatus(post.id, newStatus);
+            if (!res.ok) Alert.alert('Error', res.reason);
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
@@ -116,12 +139,20 @@ export default function PostDetailScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.circleIconBtn}>
               <Ionicons name="chevron-back" size={18} color="#fff" />
             </TouchableOpacity>
-            {!isOwnPost && (
+            {!isOwnPost && post.status !== 'sold' && (
               <TouchableOpacity onPress={handleShare} style={styles.circleIconBtn}>
                 <Ionicons name="logo-whatsapp" size={16} color="#fff" />
               </TouchableOpacity>
             )}
           </View>
+          {/* Big SOLD overlay */}
+          {post.status === 'sold' && (
+            <View style={styles.soldOverlayBig}>
+              <View style={styles.soldStamp}>
+                <Text style={styles.soldStampText}>SOLD</Text>
+              </View>
+            </View>
+          )}
           {/* Floating price badge */}
           <View style={styles.priceBadge}>
             <Text style={styles.priceBadgeText}>₹{post.price?.toFixed(0) || '0'}</Text>
@@ -201,6 +232,26 @@ export default function PostDetailScreen() {
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Owner Controls */}
+        {isOwnPost && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Manage Listing</Text>
+            <TouchableOpacity
+              style={[styles.soldToggleBtn, post.status === 'sold' ? styles.soldToggleBtnActive : undefined]}
+              onPress={toggleSold}
+            >
+              <Ionicons
+                name={post.status === 'sold' ? "checkmark-circle" : "close-circle-outline"}
+                size={20}
+                color={post.status === 'sold' ? "#fff" : "#ff4d4d"}
+              />
+              <Text style={[styles.soldToggleText, post.status === 'sold' ? styles.soldToggleTextActive : undefined]}>
+                {post.status === 'sold' ? "Mark as Available" : "Mark as Sold"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -512,5 +563,48 @@ const styles = StyleSheet.create({
     color: '#aaa',
     fontSize: 14,
   },
-
+  soldOverlayBig: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  soldStamp: {
+    borderWidth: 4,
+    borderColor: '#ff4d4d',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    transform: [{ rotate: '-15deg' }],
+  },
+  soldStampText: {
+    color: '#ff4d4d',
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: 4,
+  },
+  soldToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#ff4d4d',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  soldToggleBtnActive: {
+    backgroundColor: '#333',
+    borderColor: '#555',
+  },
+  soldToggleText: {
+    color: '#ff4d4d',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  soldToggleTextActive: {
+    color: '#fff',
+  },
 });

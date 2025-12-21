@@ -110,6 +110,11 @@ export default function UserProfileViewScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.gridItem} onPress={() => router.push(`/post/${item.id}` as any)}>
               <Image source={{ uri: item.imageUri }} style={styles.gridImage} contentFit="cover" transition={200} />
+              {item.status === 'sold' && (
+                <View style={styles.soldBadgeSmall}>
+                  <Text style={styles.soldTextSmall}>SOLD</Text>
+                </View>
+              )}
               <View style={styles.gridFooter}>
                 <Text style={styles.gridTitle} numberOfLines={1}>{(item as any).title || 'Product'}</Text>
                 {!!(item as any).price && (
@@ -180,4 +185,6 @@ const styles = StyleSheet.create({
   gridPrice: { color: '#7ddc7a', fontSize: 12, fontWeight: '800' },
   wpBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: '#25D366', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#199e4d' },
   wpBtnText: { color: '#1f3124', fontWeight: '800' },
+  soldBadgeSmall: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.85)', borderColor: '#ff4d4d', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  soldTextSmall: { color: '#ff4d4d', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
 });
