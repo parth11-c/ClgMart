@@ -42,15 +42,23 @@ const PostCard = React.memo(({ item }: { item: Post }) => {
     Linking.openURL(url).catch((e) => Alert.alert('Cannot open WhatsApp', e?.message || 'Please try again.'));
   };
 
+  // Theme-aware card colors with more contrast
+  const cardBg = theme === 'dark' ? '#141414' : '#f3f3f3ff';
+  const cardBorder = theme === 'dark' ? '#2a2a2a' : '#d5d5d5';
+  const imageBg = theme === 'dark' ? '#0a0a0a' : '#ffffff';
+  const priceBadgeBg = theme === 'dark' ? '#1f3d1f' : '#e8f5e8';
+  const priceColor = theme === 'dark' ? '#7ddc7a' : '#2d8a2d';
+
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}
+      style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}
       onPress={() => {
         hapticManager.trigger('selection');
         router.push(`/post/${item.id}` as any);
       }}
+      activeOpacity={0.9}
     >
-      <View style={[styles.imageWrap, { backgroundColor: t.background }]}>
+      <View style={[styles.imageWrap, { backgroundColor: imageBg }]}>
         <Image
           source={{ uri: item.imageUri }}
           style={styles.image}
@@ -58,7 +66,6 @@ const PostCard = React.memo(({ item }: { item: Post }) => {
           transition={200}
           cachePolicy="disk"
         />
-        <View style={styles.imageOverlay} />
         {item.status === 'sold' && (
           <View style={styles.soldBadgeAcrossImage}>
             <Text style={styles.soldTextAcrossImage}>SOLD</Text>
@@ -66,31 +73,32 @@ const PostCard = React.memo(({ item }: { item: Post }) => {
         )}
       </View>
       <View style={styles.cardBody}>
-        <View style={styles.mainInfo}>
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={[styles.title, { color: t.text }]} numberOfLines={1}>{item.title}</Text>
-            <Text style={[styles.priceText, { color: t.success }]}>₹{item.price?.toFixed?.(0) ?? item.price}</Text>
+        <Text style={[styles.title, { color: t.text }]} numberOfLines={1}>{item.title}</Text>
+
+        <View style={styles.priceRow}>
+          <View style={[styles.priceBadge, { backgroundColor: priceBadgeBg }]}>
+            <Text style={[styles.priceText, { color: priceColor }]}>₹{item.price?.toFixed?.(0) ?? item.price}</Text>
           </View>
           {item.status !== 'sold' && (
             <TouchableOpacity
               onPress={handleWhatsApp}
-              style={styles.wpButton}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={[styles.wpButton, { backgroundColor: theme === 'dark' ? '#1a3d1a' : '#dcf8dc' }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="logo-whatsapp" size={22} color={t.whatsappMuted} />
+              <Ionicons name="logo-whatsapp" size={16} color={theme === 'dark' ? '#25D366' : '#128C7E'} />
             </TouchableOpacity>
           )}
         </View>
 
-        <View style={[styles.sellerRow, { borderTopColor: t.borderSubtle }]}>
+        <View style={[styles.sellerRow, { backgroundColor: theme === 'dark' ? '#1a1a1a' : '#e0e0e0' }]}>
           {seller?.avatar ? (
             <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} contentFit="cover" cachePolicy="disk" />
           ) : (
-            <View style={[styles.sellerAvatarPlaceholder, { backgroundColor: t.borderSubtle }]} />
+            <View style={[styles.sellerAvatarPlaceholder, { backgroundColor: theme === 'dark' ? '#333' : '#ccc' }]}>
+              <Ionicons name="person" size={8} color={theme === 'dark' ? '#666' : '#999'} />
+            </View>
           )}
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sellerName, { color: theme === 'dark' ? '#888' : t.textMuted }]} numberOfLines={1}>{seller?.name || 'Seller'}</Text>
-          </View>
+          <Text style={[styles.sellerName, { color: theme === 'dark' ? '#777' : '#666' }]} numberOfLines={1}>{seller?.name || 'Seller'}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -222,67 +230,105 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Card Styles Redesigned for Elegant Contained Look
+  // Card Styles - Elegant Design with Shadows
   card: {
     width: '48%',
-    borderRadius: 24,
-    padding: 10,
+    borderRadius: 20,
+    padding: 8,
     marginBottom: 16,
     borderWidth: 1,
+    // Elegant shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   imageWrap: {
     position: 'relative',
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 18,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   image: { width: "100%", height: "100%" },
-  imageOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.06)' },
 
   cardBody: {
     paddingTop: 10,
-    paddingHorizontal: 2,
-    flex: 1,
+    paddingHorizontal: 4,
   },
-  mainInfo: {
+  title: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 8,
+    letterSpacing: -0.2,
+  },
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  title: { fontSize: 13, fontWeight: "700", marginBottom: 2 },
-  priceText: { fontWeight: '800', fontSize: 14 },
+  priceBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  priceText: {
+    fontWeight: '800',
+    fontSize: 13,
+  },
   wpButton: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 8,
   },
 
   sellerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    opacity: 0.9,
-    paddingTop: 8,
-    borderTopWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 10,
   },
-  sellerAvatar: { width: 14, height: 14, borderRadius: 7, marginRight: 6 },
-  sellerAvatarPlaceholder: { width: 14, height: 14, borderRadius: 7, marginRight: 6 },
-  sellerName: { fontSize: 10, fontWeight: '500' },
+  sellerAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  sellerAvatarPlaceholder: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sellerName: {
+    fontSize: 10,
+    fontWeight: '600',
+    flex: 1,
+  },
 
   soldBadgeAcrossImage: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.9)',
     borderColor: '#ff4d4d',
-    borderWidth: 1,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 6,
-    zIndex: 10
+    borderWidth: 1.5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    zIndex: 10,
   },
-  soldTextAcrossImage: { color: '#ff4d4d', fontWeight: '900', fontSize: 8, letterSpacing: 0.5 },
-  wpIconBtn: { marginLeft: 'auto' },
+  soldTextAcrossImage: {
+    color: '#ff4d4d',
+    fontWeight: '900',
+    fontSize: 9,
+    letterSpacing: 1,
+  },
 });

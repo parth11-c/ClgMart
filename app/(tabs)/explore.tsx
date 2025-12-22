@@ -23,8 +23,8 @@ import * as Haptics from 'expo-haptics';
 import { colors } from "@/lib/colors";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const CARD_WIDTH = SCREEN_WIDTH * 0.88;
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.63;
+const CARD_WIDTH = SCREEN_WIDTH * 0.77;  // Reduced by 12% (was 0.88)
+const CARD_HEIGHT = SCREEN_HEIGHT * 0.55;  // Reduced by 12% (was 0.63)
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
 type Post = {
@@ -110,15 +110,26 @@ function AnimatedCard({
     transform: [{ scale: interpolate(translateX.value, [10, SWIPE_THRESHOLD], [0.8, 1.2], Extrapolation.CLAMP) }]
   }));
 
+  // Theme-aware card colors with more contrast
+  const cardBg = theme === 'dark' ? '#141414' : '#eae7e7';
+  const cardBorder = theme === 'dark' ? '#2a2a2a' : '#d5d5d5';
+  const infoBg = theme === 'dark' ? '#141414' : '#eae7e7';
+  const imageBg = theme === 'dark' ? '#0a0a0a' : '#ffffff';
+
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.card, animatedStyle]}>
-        <View style={[styles.cardInner, { backgroundColor: t.card, borderColor: t.border }]}>
-          <Image
-            source={{ uri: post.imageUri }}
-            style={styles.cardImage}
-            contentFit="cover"
-          />
+        <View style={[styles.cardInner, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          {/* Image Container */}
+          <View style={[styles.imageContainer, { backgroundColor: imageBg }]}>
+            <Image
+              source={{ uri: post.imageUri }}
+              style={styles.cardImage}
+              contentFit="contain"
+            />
+            {/* Subtle gradient overlay at bottom */}
+            <View style={styles.imageGradient} />
+          </View>
           {/* Reaction Stamps */}
           <Animated.View style={[styles.stampContainer, styles.stampLeft, leftStampStyle]}>
             <Text style={styles.stampTextLeft}>SKIP</Text>
@@ -131,15 +142,19 @@ function AnimatedCard({
               <Text style={styles.soldTextSmall}>SOLD</Text>
             </View>
           )}
-          <View style={[styles.cardInfo, { backgroundColor: t.card }]}>
+          <View style={[styles.cardInfo, { backgroundColor: infoBg }]}>
             <View style={styles.cardHeaderRow}>
               <Text style={[styles.cardTitle, { color: t.text }]} numberOfLines={1}>{post.title}</Text>
               {post.price !== undefined && (
-                <Text style={[styles.cardPrice, { color: t.success }]}>₹{post.price}</Text>
+                <View style={[styles.priceBadge, { backgroundColor: theme === 'dark' ? '#1f3d1f' : '#e8f5e8' }]}>
+                  <Text style={[styles.cardPrice, { color: theme === 'dark' ? '#7ddc7a' : '#2d8a2d' }]}>₹{post.price}</Text>
+                </View>
               )}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={[styles.cardMeta, { color: theme === 'dark' ? '#aaa' : t.textMuted }]}>{post.category || 'General'}</Text>
+            <View style={styles.categoryRow}>
+              <View style={[styles.categoryBadge, { backgroundColor: theme === 'dark' ? '#252525' : '#d8d8d8' }]}>
+                <Text style={[styles.cardMeta, { color: theme === 'dark' ? '#aaa' : '#555' }]}>{post.category || 'General'}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -206,6 +221,7 @@ const SparkleBackground = () => {
 };
 
 const TopSwipeGuide = () => {
+  const { theme } = useStore();
   const opacity = useSharedValue(0.4);
   React.useEffect(() => {
     opacity.value = withRepeat(withTiming(1.0, { duration: 1200 }), -1, true);
@@ -213,16 +229,21 @@ const TopSwipeGuide = () => {
 
   const pulseStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
+  // Theme-aware colors for visibility
+  const skipColor = theme === 'dark' ? '#ff4d4d' : '#cc3333';
+  const openColor = theme === 'dark' ? '#7ddc7a' : '#22aa22';
+  const indicatorBg = theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
   return (
     <View style={styles.topGuideContainer}>
-      <Animated.View style={[styles.guideIndicator, pulseStyle]}>
-        <Ionicons name="chevron-back" size={14} color="#ff4d4d" />
-        <Text style={styles.guideText}>Skip</Text>
+      <Animated.View style={[styles.guideIndicator, { backgroundColor: indicatorBg }, pulseStyle]}>
+        <Ionicons name="chevron-back" size={14} color={skipColor} />
+        <Text style={[styles.guideText, { color: skipColor }]}>Skip</Text>
       </Animated.View>
       <View style={styles.guideSpacer} />
-      <Animated.View style={[styles.guideIndicator, pulseStyle]}>
-        <Text style={styles.guideText}>Open</Text>
-        <Ionicons name="chevron-forward" size={14} color="#7ddc7a" />
+      <Animated.View style={[styles.guideIndicator, { backgroundColor: indicatorBg }, pulseStyle]}>
+        <Text style={[styles.guideText, { color: openColor }]}>Open</Text>
+        <Ionicons name="chevron-forward" size={14} color={openColor} />
       </Animated.View>
     </View>
   );
@@ -399,48 +420,78 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: 28,
+    // Elegant shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
   },
   cardInner: {
     flex: 1,
     borderRadius: 28,
     overflow: 'hidden',
-    // noticeable border for deck effect
-    borderWidth: 2,
+    borderWidth: 1.5,
+  },
+  imageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   cardImage: {
-    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
     backgroundColor: 'transparent',
   },
   cardInfo: {
-    padding: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    marginTop: -2,
-    // minimal shadow on info part
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   cardTitle: {
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: 20,
+    fontWeight: '800',
     flex: 1,
     marginRight: 10,
+    letterSpacing: -0.3,
+  },
+  priceBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
   cardPrice: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   cardMeta: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
+    textTransform: 'capitalize',
   },
   soldBadgeSmall: {
     position: 'absolute',
