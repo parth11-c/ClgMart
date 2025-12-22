@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import type { Product, StoreState, User } from './types';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, AppStateStatus } from 'react-native';
 
 const POSTS_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_POSTS_BUCKET || 'post-images';
 const AVATARS_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_AVATARS_BUCKET || 'avatars';
@@ -59,16 +60,21 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       const storedTheme = await AsyncStorage.getItem('clgmart_theme');
       if (storedTheme === 'light' || storedTheme === 'dark') {
         setState(prev => ({ ...prev, theme: storedTheme as 'dark' | 'light' }));
+      } else {
+        // Default to dark if no preference found
+        await AsyncStorage.setItem('clgmart_theme', 'dark');
       }
     };
     loadTheme();
   }, []);
 
   const getUser: StoreContextType['getUser'] = useCallback(async (userId: string) => {
+    if (!userId) return undefined;
     if (state.users[userId]) return state.users[userId];
-    // Fetch
+
     try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      if (error) throw error;
       if (data) {
         const u: User = {
           id: data.id,
@@ -77,11 +83,19 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
           phone: data.phone,
           email: data.email
         };
-        setState(prev => ({ ...prev, users: { ...prev.users, [userId]: u } }));
+        setState(prev => {
+          const nextUsers = { ...prev.users, [userId]: u };
+          // Cap user cache at 100 entries to prevent memory leak
+          const keys = Object.keys(nextUsers);
+          if (keys.length > 100) {
+            delete nextUsers[keys[0]];
+          }
+          return { ...prev, users: nextUsers };
+        });
         return u;
       }
     } catch (e) {
-      console.warn('getUser failed', e);
+      console.warn('[Store] getUser failed:', e);
     }
     return undefined;
   }, [state.users]);
@@ -224,10 +238,20 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       })
       .subscribe();
 
+    // AppState handling for fresh data and session consistency (Play Store best practice)
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        loadSession();
+        loadPosts();
+      }
+    };
+    const appStateSub = AppState.addEventListener('change', handleAppStateChange);
+
     return () => {
       authSub.subscription.unsubscribe();
       productsSub.unsubscribe();
       profilesSub.unsubscribe();
+      appStateSub.remove();
     };
   }, [loadSession, loadPosts]);
 

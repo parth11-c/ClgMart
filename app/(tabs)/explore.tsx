@@ -228,14 +228,108 @@ const TopSwipeGuide = () => {
   );
 };
 
+const TutorialOverlay = () => {
+  const handX = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  React.useEffect(() => {
+    opacity.value = withTiming(1, { duration: 800 });
+    handX.value = withRepeat(
+      withSequence(
+        withTiming(-80, { duration: 1000 }),
+        withDelay(300, withTiming(80, { duration: 1000 })),
+        withDelay(300, withTiming(0, { duration: 600 }))
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const handStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: handX.value }]
+  }));
+
+  const leftHintStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(handX.value, [-10, -50], [0, 1], Extrapolation.CLAMP),
+    transform: [{ scale: interpolate(handX.value, [-10, -50], [0.8, 1.2], Extrapolation.CLAMP) }]
+  }));
+
+  const rightHintStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(handX.value, [10, 50], [0, 1], Extrapolation.CLAMP),
+    transform: [{ scale: interpolate(handX.value, [10, 50], [0.8, 1.2], Extrapolation.CLAMP) }]
+  }));
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={styles.tutorialContent}>
+        <Animated.View style={[styles.tutorialHint, styles.tutorialHintLeft, leftHintStyle]}>
+          <Text style={styles.tutorialHintText}>SKIP</Text>
+        </Animated.View>
+        <Animated.View style={[styles.tutorialHint, styles.tutorialHintRight, rightHintStyle]}>
+          <Text style={styles.tutorialHintText}>VIEW</Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.tutorialHand, handStyle]}>
+          <Ionicons name="finger-print" size={60} color="rgba(255,255,255,0.8)" />
+          <View style={styles.tutorialGlow} />
+        </Animated.View>
+        <Text style={styles.tutorialText}>Swipe cards to explore</Text>
+      </View>
+    </View>
+  );
+};
+
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const { posts, theme } = useStore();
   const t = colors[theme];
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [visiblePosts, setVisiblePosts] = React.useState<Post[]>([]);
+  const [showTutorial, setShowTutorial] = React.useState(true);
 
   React.useEffect(() => {
+    const timer = setTimeout(() => setShowTutorial(false), 6000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  React.useEffect(() => {
+    // Only initialize if we don't have posts yet
+    if (visiblePosts.length === 0 && posts.length > 0) {
+      const randomized = posts
+        .filter(p => !!p && p.status !== 'inactive')
+        .map(p => ({
+          id: p.id,
+          title: p.title,
+          imageUri: p.imageUri,
+          status: p.status,
+          price: p.price,
+          category: p.category
+        }))
+        .sort(() => Math.random() - 0.5);
+      setVisiblePosts(randomized as Post[]);
+      setCurrentIndex(0);
+    }
+  }, [posts, visiblePosts.length]);
+
+  const handleSwipeLeft = () => {
+    if (showTutorial) setShowTutorial(false);
+    hapticManager.trigger(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentIndex(prev => prev + 1);
+  };
+
+  const handleSwipeRight = () => {
+    if (showTutorial) setShowTutorial(false);
+    const currentPost = visiblePosts[currentIndex];
+    if (currentPost) {
+      hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
+      router.push(`/post/${currentPost.id}` as any);
+      setTimeout(() => setCurrentIndex(prev => prev + 1), 600);
+    }
+  };
+
+  const handleReset = () => {
+    hapticManager.trigger('selection');
     const randomized = posts
       .filter(p => !!p && p.status !== 'inactive')
       .map(p => ({
@@ -248,25 +342,6 @@ export default function ExploreScreen() {
       }))
       .sort(() => Math.random() - 0.5);
     setVisiblePosts(randomized as Post[]);
-    setCurrentIndex(0);
-  }, [posts]);
-
-  const handleSwipeLeft = () => {
-    hapticManager.trigger(Haptics.ImpactFeedbackStyle.Light);
-    setCurrentIndex(prev => prev + 1);
-  };
-
-  const handleSwipeRight = () => {
-    const currentPost = visiblePosts[currentIndex];
-    if (currentPost) {
-      hapticManager.trigger(Haptics.ImpactFeedbackStyle.Medium);
-      router.push(`/post/${currentPost.id}` as any);
-      setTimeout(() => setCurrentIndex(prev => prev + 1), 600);
-    }
-  };
-
-  const handleReset = () => {
-    hapticManager.trigger('selection');
     setCurrentIndex(0);
   };
 
@@ -289,19 +364,21 @@ export default function ExploreScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            visiblePosts.slice(currentIndex, currentIndex + 3).reverse().map((post, sliceIdx, arr) => {
-              // top card is index 0 in the swipe logic
-              const relativeIndex = (arr.length - 1) - sliceIdx;
-              return (
-                <AnimatedCard
-                  key={post.id}
-                  post={post}
-                  index={relativeIndex}
-                  onSwipeLeft={handleSwipeLeft}
-                  onSwipeRight={handleSwipeRight}
-                />
-              );
-            })
+            <>
+              {visiblePosts.slice(currentIndex, currentIndex + 3).reverse().map((post, sliceIdx, arr) => {
+                const relativeIndex = (arr.length - 1) - sliceIdx;
+                return (
+                  <AnimatedCard
+                    key={post.id}
+                    post={post}
+                    index={relativeIndex}
+                    onSwipeLeft={handleSwipeLeft}
+                    onSwipeRight={handleSwipeRight}
+                  />
+                );
+              })}
+              {showTutorial && <TutorialOverlay />}
+            </>
           )}
         </View>
       </SafeAreaView>
@@ -478,5 +555,54 @@ const styles = StyleSheet.create({
   sparkle: {
     position: 'absolute',
     zIndex: 1,
+  },
+  tutorialContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  tutorialHand: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  tutorialGlow: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    zIndex: -1,
+  },
+  tutorialText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 10,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  tutorialHint: {
+    position: 'absolute',
+    borderWidth: 3,
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    top: '35%',
+  },
+  tutorialHintLeft: {
+    left: 40,
+    borderColor: '#ff4d4d',
+  },
+  tutorialHintRight: {
+    right: 40,
+    borderColor: '#7ddc7a',
+  },
+  tutorialHintText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '900',
   },
 });

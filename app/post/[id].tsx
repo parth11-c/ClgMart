@@ -1,14 +1,17 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Linking, Alert, Image as RNImage } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Linking, Alert, Image as RNImage, Modal, Dimensions, StatusBar } from "react-native";
 import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { useStore } from "@/store";
 import { Ionicons } from '@expo/vector-icons';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { User } from "@/store/types";
 import { hapticManager } from "@/lib/sound";
 import * as Haptics from 'expo-haptics';
 import { colors } from "@/lib/colors";
+import { Extrapolation, interpolate } from "react-native-reanimated";
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,6 +23,7 @@ export default function PostDetailScreen() {
 
   const [activeImageIndex, setActiveImageIndex] = React.useState(0);
   const [seller, setSeller] = React.useState<User | undefined>(undefined);
+  const [showFullscreen, setShowFullscreen] = React.useState(false);
 
   React.useEffect(() => {
     let mounted = true;
@@ -144,15 +148,20 @@ export default function PostDetailScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: t.background }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         {/* Image Gallery */}
-        <View style={styles.imageContainer}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => {
+            hapticManager.trigger('selection');
+            setShowFullscreen(true);
+          }}
+          style={styles.imageContainer}
+        >
           <Image
             source={{ uri: post?.imageUri }}
             style={styles.image}
             contentFit="cover"
             transition={300}
           />
-          <View style={styles.imageOverlay} />
-
           {/* Top icon bar over image */}
           <View style={styles.topImageBar}>
             <TouchableOpacity
@@ -176,6 +185,7 @@ export default function PostDetailScreen() {
               </TouchableOpacity>
             )}
           </View>
+
           {/* Big SOLD overlay */}
           {post.status === 'sold' && (
             <View style={styles.soldOverlayBig}>
@@ -184,23 +194,12 @@ export default function PostDetailScreen() {
               </View>
             </View>
           )}
+
           {/* Floating price badge */}
           <View style={[styles.priceBadge, { backgroundColor: t.background + 'cc' }]}>
             <Text style={[styles.priceBadgeText, { color: t.text }]}>₹{post.price?.toFixed(0) || '0'}</Text>
           </View>
-          {/* Image Pagination Dots */}
-          <View style={styles.imagePagination}>
-            {[1, 2, 3].map((_: number, idx: number) => (
-              <View
-                key={idx}
-                style={[
-                  styles.paginationDot,
-                  idx === activeImageIndex ? styles.paginationDotActive : undefined,
-                ]}
-              />
-            ))}
-          </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Product Info */}
         <View style={styles.productHeader}>
@@ -297,7 +296,63 @@ export default function PostDetailScreen() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Fullscreen Image Viewer Modal */}
+      <Modal visible={showFullscreen} transparent animationType="fade" onRequestClose={() => setShowFullscreen(false)}>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
+          <StatusBar barStyle="light-content" />
+          <SafeAreaView style={styles.fullscreenContainer}>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setShowFullscreen(false)}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+
+            <ZoomableImage uri={post?.imageUri || ''} />
+          </SafeAreaView>
+        </GestureHandlerRootView>
+      </Modal>
+    </SafeAreaView >
+  );
+}
+
+// Separate component for clarity and proper hook usage
+function ZoomableImage({ uri }: { uri: string }) {
+  const scale = useSharedValue(1);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
+
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = e.scale;
+      focalX.value = e.focalX;
+      focalY.value = e.focalY;
+    })
+    .onEnd(() => {
+      scale.value = withSpring(1);
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: focalX.value },
+      { translateY: focalY.value },
+      { scale: scale.value },
+      { translateX: -focalX.value },
+      { translateY: -focalY.value },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={pinchGesture}>
+      <Animated.View style={styles.fullscreenImageContainer}>
+        <Image
+          source={{ uri }}
+          style={styles.fullscreenImage}
+          contentFit="contain"
+        />
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -609,5 +664,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  fullscreenContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullscreenImageContainer: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
+    justifyContent: 'center',
+  },
+  fullscreenImage: {
+    flex: 1,
   },
 });

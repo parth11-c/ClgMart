@@ -8,6 +8,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 import { colors } from "@/lib/colors";
 import { useStore } from "@/store";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function RootInner() {
   const { theme } = useStore();
@@ -24,9 +25,11 @@ function RootInner() {
 
 export default function RootLayout() {
   return (
-    <StoreProvider>
-      <RootInner />
-    </StoreProvider>
+    <ErrorBoundary>
+      <StoreProvider>
+        <RootInner />
+      </StoreProvider>
+    </ErrorBoundary>
   );
 }
 

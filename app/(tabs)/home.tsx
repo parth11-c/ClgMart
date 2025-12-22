@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Linking, TextInput, Image as RNImage } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Linking, TextInput, Image as RNImage, Platform } from "react-native";
 import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "@/store";
@@ -12,7 +12,7 @@ import { colors } from "@/lib/colors";
 
 type Post = ReturnType<typeof useStore>["posts"][number];
 
-function PostCard({ item }: { item: Post }) {
+const PostCard = React.memo(({ item }: { item: Post }) => {
   const { getUser, theme } = useStore();
   const t = colors[theme];
   const [seller, setSeller] = React.useState<User | undefined>(undefined);
@@ -51,7 +51,13 @@ function PostCard({ item }: { item: Post }) {
       }}
     >
       <View style={[styles.imageWrap, { backgroundColor: t.background }]}>
-        <Image source={{ uri: item.imageUri }} style={styles.image} contentFit="cover" transition={200} />
+        <Image
+          source={{ uri: item.imageUri }}
+          style={styles.image}
+          contentFit="cover"
+          transition={200}
+          cachePolicy="disk"
+        />
         <View style={styles.imageOverlay} />
         {item.status === 'sold' && (
           <View style={styles.soldBadgeAcrossImage}>
@@ -78,7 +84,7 @@ function PostCard({ item }: { item: Post }) {
 
         <View style={[styles.sellerRow, { borderTopColor: t.borderSubtle }]}>
           {seller?.avatar ? (
-            <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} contentFit="cover" />
+            <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} contentFit="cover" cachePolicy="disk" />
           ) : (
             <View style={[styles.sellerAvatarPlaceholder, { backgroundColor: t.borderSubtle }]} />
           )}
@@ -89,7 +95,7 @@ function PostCard({ item }: { item: Post }) {
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 export default function HomeScreen() {
   const { posts, theme } = useStore();
@@ -105,6 +111,10 @@ export default function HomeScreen() {
       p.category?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [posts, searchQuery]);
+
+  const renderItem = React.useCallback(({ item }: { item: any }) => (
+    <PostCard item={item} />
+  ), []);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: t.background }]} edges={['left', 'right']}>
@@ -158,12 +168,17 @@ export default function HomeScreen() {
           numColumns={2}
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={[styles.list, { paddingBottom: 20 }]}
-          renderItem={({ item }) => (<PostCard item={item as any} />)}
-          initialNumToRender={10}
+          renderItem={renderItem}
+          initialNumToRender={8}
           maxToRenderPerBatch={10}
-          windowSize={5}
-          removeClippedSubviews={true}
+          windowSize={11}
+          removeClippedSubviews={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}
+          getItemLayout={(_, index) => ({
+            length: 250, // Approx card height
+            offset: 250 * Math.floor(index / 2),
+            index,
+          })}
         />
       )}
     </SafeAreaView>
