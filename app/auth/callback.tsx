@@ -13,18 +13,34 @@ export default function AuthCallbackScreen() {
       try {
         const parsed = Linking.parse(url);
         const code = (parsed.queryParams?.code as string) || '';
+
+        // If we have a code, try to exchange it. 
+        // We suppress errors here because lib/oauth.ts might have already exchanged it.
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
+          if (error) console.log('Callback exchange error (might be duplicate):', error.message);
         }
+
+        // Check the session state
         const { data: { session } } = await supabase.auth.getSession();
         if (!mounted) return;
-        if (session?.user) router.replace('/(tabs)/home' as any);
-        else router.replace('/auth/sign-in' as any);
+
+        if (session?.user) {
+          router.replace('/(tabs)/home' as any);
+        } else {
+          // If no session yet, wait a moment or redirect to sign-in
+          setTimeout(async () => {
+            const { data: { session: delayedSession } } = await supabase.auth.getSession();
+            if (delayedSession?.user) {
+              router.replace('/(tabs)/home' as any);
+            } else {
+              router.replace('/auth/sign-in' as any);
+            }
+          }, 1000);
+        }
       } catch (e: any) {
-        if (!mounted) return;
-        Alert.alert('Auth error', e?.message || 'Could not complete sign-in');
-        router.replace('/auth/sign-in' as any);
+        console.warn('Callback error:', e);
+        if (mounted) router.replace('/auth/sign-in' as any);
       }
     };
 
@@ -32,9 +48,11 @@ export default function AuthCallbackScreen() {
       const initial = await Linking.getInitialURL();
       if (initial) await handleUrl(initial);
       else {
-        // Fallback: check session directly
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) router.replace('/(tabs)/home' as any);
+        else {
+          // No URL and no session found initially? Wait for listener or redirect
+        }
       }
     })();
 

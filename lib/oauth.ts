@@ -21,11 +21,11 @@ function resolveRedirectUrl(): string | undefined {
     if (typeof window === 'undefined') return undefined;
     return `${window.location.origin}/auth/callback`;
   }
-  // This automatically generates:
-  // - exp://IP:PORT/--/auth/callback (in Development)
-  // - travel://auth/callback (in Production)
+
+  // Explicitly construct the URL based on the app scheme 'travel'
+  // using Linking.createURL ensures it handles Expo Go vs Standalone correctly.
   const url = Linking.createURL('/auth/callback');
-  console.log('[OAuth] Redirect URL:', url);
+  console.log('[OAuth] Resolved Redirect URL:', url);
   return url;
 }
 
@@ -37,7 +37,9 @@ export async function startGoogleOAuth() {
   if (Platform.OS === 'web') {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: redirectTo ? { redirectTo } : undefined,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
     if (error) throw error as any;
     return;
