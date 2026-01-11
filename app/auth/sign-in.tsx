@@ -22,22 +22,34 @@ export default function SignInScreen() {
     (async () => {
       // Check initial session
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[SignIn] Initial session check:', !!session?.user);
       if (!mounted) return;
-      if (session?.user) router.replace("/(tabs)/home" as any);
+      if (session?.user) {
+        console.log('[SignIn] User already signed in, redirecting to home');
+        router.replace("/(tabs)/home" as any);
+      }
     })();
 
     // Listen for auth state changes (e.g. after OAuth / magic link)
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) router.replace("/(tabs)/home" as any);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[SignIn] Auth state changed:', event, !!session?.user);
+      if (session?.user) {
+        console.log('[SignIn] Session detected, redirecting to home');
+        router.replace("/(tabs)/home" as any);
+      }
     });
 
     // Also listen for deep links returning to the app
     const linkSub = Linking.addEventListener('url', async ({ url }) => {
       try {
+        console.log('[SignIn] Deep link received');
         // If we get a deep link, try to parse session from it or just check session
         // Expo Go sometimes handles the callback internally, so we just check session status
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) router.replace("/(tabs)/home" as any);
+        if (session?.user) {
+          console.log('[SignIn] Session found after deep link, redirecting to home');
+          router.replace("/(tabs)/home" as any);
+        }
       } catch (e) {
         console.warn('Deep link check error', e);
       }

@@ -14,16 +14,21 @@ export default function Index() {
 
   useEffect(() => {
     let mounted = true;
+    console.log('[Index] Component mounted, checking session...');
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('[Index] Session check result:', !!session?.user);
         if (!mounted) return;
         if (session?.user) {
+          console.log('[Index] User logged in, redirecting to home');
           router.replace("/(tabs)/home" as any);
         } else {
+          console.log('[Index] No session, showing landing page');
           setChecking(false);
         }
       } catch (e) {
+        console.error('[Index] Session check error:', e);
         setChecking(false);
       }
     })();
