@@ -17,14 +17,29 @@ export default function Index() {
     console.log('[Index] Component mounted, checking session...');
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('[Index] Session check result:', !!session?.user);
-        if (!mounted) return;
-        if (session?.user) {
-          console.log('[Index] User logged in, redirecting to home');
-          router.replace("/(tabs)/home" as any);
-        } else {
-          console.log('[Index] No session, showing landing page');
+        // Check session multiple times to account for OAuth callback delay
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        while (attempts < maxAttempts && mounted) {
+          const { data: { session } } = await supabase.auth.getSession();
+          console.log('[Index] Session check result (attempt', attempts + 1, '):', !!session?.user);
+
+          if (session?.user) {
+            console.log('[Index] User logged in, redirecting to home');
+            router.replace("/(tabs)/home" as any);
+            return;
+          }
+
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+
+        // No session after all attempts
+        if (mounted) {
+          console.log('[Index] No session after', maxAttempts, 'attempts, showing landing page');
           setChecking(false);
         }
       } catch (e) {

@@ -1,120 +1,86 @@
 import React from 'react';
 import { Platform } from 'react-native';
-import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { supabase } from '@/lib/supabase';
 
-// Helper to keep browser warm (Android)
+// Configure Google Sign-In
+GoogleSignin.configure({
+  webClientId: '611547918208-vs6on405mveabih0lhonie8jp9384ib9.apps.googleusercontent.com', // Web client ID from Google Cloud Console
+  iosClientId: '611547918208-vs6on405mveabih0lhonie8jp9384ib9.apps.googleusercontent.com',
+  offlineAccess: false,
+});
+
 export function useWarmUpBrowser() {
-  React.useEffect(() => {
-    void WebBrowser.warmUpAsync();
-    return () => {
-      void WebBrowser.coolDownAsync();
-    };
-  }, []);
-}
-
-WebBrowser.maybeCompleteAuthSession();
-
-function resolveRedirectUrl(): string | undefined {
-  if (Platform.OS === 'web') {
-    if (typeof window === 'undefined') return undefined;
-    return `${window.location.origin}/auth/callback`;
-  }
-
-  // Explicitly construct the URL based on the app scheme 'travel'
-  // using Linking.createURL ensures it handles Expo Go vs Standalone correctly.
-  const url = Linking.createURL('/auth/callback');
-  console.log('[OAuth] Resolved Redirect URL:', url);
-  return url;
+  // Not needed for native sign-in, but kept for compatibility
+  React.useEffect(() => { }, []);
 }
 
 export async function startGoogleOAuth() {
-  const redirectTo = resolveRedirectUrl();
+  console.log('[OAuth] Starting native Google Sign-In...');
 
-  console.log('[OAuth] Starting Google Auth...');
+  try {
+    // Check if device supports Google Play Services (Android)
+    await GoogleSignin.hasPlayServices();
+    console.log('[OAuth] Play Services available');
 
-  if (Platform.OS === 'web') {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) throw error as any;
-    return;
-  }
+    // Sign in and get user info + ID token
+    const userInfo = await GoogleSignin.signIn();
+    console.log('[OAuth] User signed in:', userInfo.data?.user.email);
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true,
-    } as any,
-  });
+    // Get the ID token
+    const tokens = await GoogleSignin.getTokens();
+    const idToken = tokens.idToken;
 
-  if (error) throw error as any;
-  const url = (data as any)?.url as string | undefined;
-  if (!url) throw new Error('No OAuth URL returned from Supabase');
-
-  // Open the browser
-  const res = await WebBrowser.openAuthSessionAsync(url, redirectTo ?? undefined);
-  console.log('[OAuth] Browser Result:', res.type);
-
-  // Handle the return
-  if (res.type === 'success' && res.url) {
-    const logUrl = res.url
-      .replace(/code=[^&]+/, 'code=***')
-      .replace(/access_token=[^&]+/, 'access_token=***')
-      .replace(/refresh_token=[^&]+/, 'refresh_token=***');
-    console.log('[OAuth] Success URL returned:', logUrl);
-
-    try {
-      const fullUrl = res.url;
-      const parsed = Linking.parse(fullUrl);
-      let queryParams = parsed.queryParams || {};
-
-      // Robust extraction for both Query (?) and Fragment (#)
-      // Some parsers lose the fragment, so we check the raw URL
-      const getParam = (name: string) => {
-        const regex = new RegExp(`[#?&]${name}=([^&]+)`);
-        const match = fullUrl.match(regex);
-        return match ? decodeURIComponent(match[1]) : undefined;
-      };
-
-      const code = queryParams.code as string || getParam('code');
-      const accessToken = queryParams.access_token as string || getParam('access_token');
-      const refreshToken = queryParams.refresh_token as string || getParam('refresh_token');
-
-      if (accessToken || code) {
-        console.log('[OAuth] Auth data detected in URL');
-      }
-
-      if (code) {
-        console.log('[OAuth] Code found, exchanging for session...');
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) throw error;
-        console.log('[OAuth] Code exchange successful');
-      } else if (accessToken && refreshToken) {
-        console.log('[OAuth] Tokens found directly, setting session...');
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        });
-        if (error) throw error;
-        console.log('[OAuth] Session set successfully');
-      } else {
-        const errorParam = getParam('error');
-        if (errorParam) {
-          console.error('[OAuth] Auth Error from Provider:', errorParam, getParam('error_description'));
-        } else {
-          console.warn('[OAuth] No code or tokens found in Redirect URL. Raw URL:', fullUrl.split('#')[0] + '#MASKED');
-        }
-      }
-    } catch (e) {
-      console.error('[OAuth] Auth processing error:', e);
+    if (!idToken) {
+      throw new Error('No ID token received from Google');
     }
-  } else {
-    console.log('[OAuth] Browser closed or cancelled:', res.type);
+
+    console.log('[OAuth] ID token received, signing in to Supabase...');
+
+    // Sign in to Supabase using the Google ID token
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: idToken,
+    });
+
+    if (error) {
+      console.error('[OAuth] Supabase sign-in error:', error.message);
+      throw error;
+    }
+
+    console.log('[OAuth] Successfully signed in to Supabase');
+    console.log('[OAuth] User:', data.user?.email);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[OAuth] Error:', error);
+
+    // Handle specific error cases
+    if (error.code === 'SIGN_IN_CANCELLED') {
+      console.log('[OAuth] User cancelled sign-in');
+      return { success: false, cancelled: true };
+    }
+
+    if (error.code === 'IN_PROGRESS') {
+      console.log('[OAuth] Sign-in already in progress');
+      return { success: false, error: 'Sign-in already in progress' };
+    }
+
+    if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+      console.log('[OAuth] Play Services not available');
+      return { success: false, error: 'Google Play Services not available' };
+    }
+
+    throw error;
+  }
+}
+
+// Sign out from Google
+export async function signOutGoogle() {
+  try {
+    await GoogleSignin.signOut();
+    console.log('[OAuth] Signed out from Google');
+  } catch (error) {
+    console.error('[OAuth] Error signing out:', error);
   }
 }

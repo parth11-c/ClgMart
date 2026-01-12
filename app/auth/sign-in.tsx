@@ -64,10 +64,20 @@ export default function SignInScreen() {
 
   const handleGoogleAuth = async () => {
     try {
-      await startGoogleOAuth();
-      // On success, the deep link listener above or onAuthStateChange will handle navigation
+      const result = await startGoogleOAuth();
+
+      // Native sign-in returns a result object
+      if (result && result.success) {
+        console.log('[SignIn] Google sign-in successful, navigating to home');
+        router.replace('/(tabs)/home' as any);
+      } else if (result && result.cancelled) {
+        console.log('[SignIn] User cancelled Google sign-in');
+        // Don't show error for cancellation
+      } else if (result && result.error) {
+        Alert.alert('Sign in failed', result.error);
+      }
     } catch (e: any) {
-      if (e?.message?.includes('User canceled')) return; // ignore cancel
+      console.error('[SignIn] Google auth error:', e);
       Alert.alert('OAuth error', e?.message || 'Could not start Google sign-in');
     }
   };

@@ -239,15 +239,22 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       .subscribe();
 
     // AppState handling for fresh data and session consistency (Play Store best practice)
+    let appStateTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        loadSession();
-        loadPosts();
+        // Add a delay to avoid race conditions with OAuth callback
+        if (appStateTimeout) clearTimeout(appStateTimeout);
+        appStateTimeout = setTimeout(() => {
+          console.log('[Store] App became active, refreshing session...');
+          loadSession();
+          loadPosts();
+        }, 1000); // Wait 1 second after app becomes active
       }
     };
     const appStateSub = AppState.addEventListener('change', handleAppStateChange);
 
     return () => {
+      if (appStateTimeout) clearTimeout(appStateTimeout);
       authSub.subscription.unsubscribe();
       productsSub.unsubscribe();
       profilesSub.unsubscribe();

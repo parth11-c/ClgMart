@@ -62,8 +62,8 @@ export default function AuthCallbackScreen() {
           }
         }
 
-        // Give Supabase a moment to update the session
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Give Supabase time to propagate the session
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Check final session state
         const { data: { session } } = await supabase.auth.getSession();
@@ -72,6 +72,11 @@ export default function AuthCallbackScreen() {
         console.log('[Callback] Final session check:', !!session?.user);
 
         if (session?.user) {
+          console.log('[Callback] Session confirmed, waiting for store to update...');
+
+          // Wait a bit more for the store's onAuthStateChange listener to update currentUser
+          await new Promise(resolve => setTimeout(resolve, 500));
+
           console.log('[Callback] Redirecting to home');
           router.replace('/(tabs)/home' as any);
         } else {

@@ -10,6 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.parth1127.ClgMartApp",
       "infoPlist": {
         "NSCameraUsageDescription": "Capture a place photo to create a post.",
         "NSPhotoLibraryUsageDescription": "Select a place photo to create a post.",
@@ -21,7 +22,7 @@
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/Clgmart LogoF.png"
       },
-      "versionCode": 8,
+      "versionCode": 9,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.parth1127.ClgMartApp"
@@ -44,7 +45,15 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosClientId": "611547918208-vs6on405mveabih0lhonie8jp9384ib9.apps.googleusercontent.com",
+          "androidClientId": "611547918208-c5vtu3nmg5658gf9vs2t3m0eda8qdmh1.apps.googleusercontent.com",
+          "iosUrlScheme": "com.googleusercontent.apps.611547918208-vs6on405mveabih0lhonie8jp9384ib9"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
